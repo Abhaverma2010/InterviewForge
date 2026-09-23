@@ -1,0 +1,19 @@
+{
+  "name": "interviewforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turns a job description and a company URL into a personalised interview prep kit.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "evaluate": "node scripts/evaluate.js",
+    "dev:api": "npm run dev -w @interviewforge/api",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

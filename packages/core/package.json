@@ -1,0 +1,14 @@
+{
+  "name": "@interviewforge/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Research, generation, scheduling and validation pipeline. No HTTP, no database.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
