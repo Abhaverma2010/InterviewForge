@@ -17,38 +17,52 @@ if (existsSync(TARGET)) {
   console.log('Existing .env backed up to .env.backup');
 }
 
-const rl = createInterface({ input: process.stdin, output: process.stdout });
-const key = (await rl.question('Paste your Gemini API key and press Enter: ')).trim();
-rl.close();
+// Exits by setting process.exitCode rather than calling process.exit():
+// on Windows, process.exit() right after fetch() can crash Node with a
+// libuv "UV_HANDLE_CLOSING" assertion.
+process.exitCode = await main();
 
-if (!key) {
-  console.error('No key entered. Get one at https://aistudio.google.com/apikey and run npm run setup again.');
-  process.exit(1);
-}
+async function main() {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const key = (await rl.question('Paste your Gemini API key and press Enter: ')).trim();
+  rl.close();
 
-const contents = readFileSync(EXAMPLE, 'utf8').replace(/^LLM_API_KEY=.*$/m, `LLM_API_KEY=${key}`);
-// Always UTF-8: Node cannot read the UTF-16 files PowerShell's ">" produces.
-writeFileSync(TARGET, contents, 'utf8');
-console.log('Wrote .env');
+  if (!key) {
+    console.error(
+      'No key entered. Get one at https://aistudio.google.com/apikey and run npm run setup again.',
+    );
+    return 1;
+  }
 
-const baseUrl = contents.match(/^LLM_BASE_URL=(.*)$/m)[1].trim();
-const model = contents.match(/^LLM_MODEL=(.*)$/m)[1].trim();
+  const contents = readFileSync(EXAMPLE, 'utf8').replace(/^LLM_API_KEY=.*$/m, `LLM_API_KEY=${key}`);
+  // Always UTF-8: Node cannot read the UTF-16 files PowerShell's ">" produces.
+  writeFileSync(TARGET, contents, 'utf8');
+  console.log('Wrote .env');
 
-process.stdout.write('Testing the key... ');
-const res = await fetch(`${baseUrl}/models`, { headers: { Authorization: `Bearer ${key}` } });
-if (!res.ok) {
-  console.log(`FAILED (HTTP ${res.status})`);
-  console.log((await res.text()).slice(0, 500));
-  process.exit(1);
-}
+  const baseUrl = contents.match(/^LLM_BASE_URL=(.*)$/m)[1].trim();
+  const model = contents.match(/^LLM_MODEL=(.*)$/m)[1].trim();
 
-const { data = [] } = await res.json();
-const ids = data.map((m) => m.id.replace(/^models\//, ''));
-console.log('OK');
-if (ids.length && !ids.includes(model)) {
-  const flash = ids.filter((id) => id.includes('flash')).slice(0, 8);
-  console.log(`Warning: model "${model}" is not available to this key.`);
-  console.log(`Set LLM_MODEL in .env to one of: ${flash.join(', ')}`);
-} else {
-  console.log(`Model "${model}" is available. You're ready: node --env-file=.env scripts/hello-llm.js`);
+  process.stdout.write('Testing the key... ');
+  const res = await fetch(`${baseUrl}/models`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) {
+    console.log(`FAILED (HTTP ${res.status})`);
+    console.log((await res.text()).slice(0, 500));
+    return 1;
+  }
+
+  const { data = [] } = await res.json();
+  const ids = data.map((m) => m.id.replace(/^models\//, ''));
+  console.log('OK');
+  if (ids.length && !ids.includes(model)) {
+    const flash = ids.filter((id) => id.includes('flash')).slice(0, 8);
+    console.log(`Warning: model "${model}" is not available to this key.`);
+    console.log(`Set LLM_MODEL in .env to one of: ${flash.join(', ')}`);
+  } else {
+    console.log(
+      `Model "${model}" is available. You're ready: node --env-file=.env scripts/hello-llm.js`,
+    );
+  }
+  return 0;
 }
