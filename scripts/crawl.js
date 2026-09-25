@@ -17,6 +17,10 @@ for (const url of urls) {
   console.log(`  reachable: ${result.reachable}${result.error ? ` (${result.error.code})` : ''}`);
   console.log(`  hiring page: ${result.hiringPage ?? 'none found'}`);
   console.log(`  about page:  ${result.aboutPage ?? 'none found'}`);
-  for (const p of result.pages) console.log(`  [${p.kind}] ${p.url} — ${p.text.length} chars`);
+  for (const p of result.pages) {
+    const notes = [`${p.text.length} chars`, `${p.hiringSignals} hiring signals`];
+    if (p.truncated) notes.push('truncated');
+    console.log(`  [${p.kind}] ${p.url} — ${notes.join(', ')}`);
+  }
   for (const s of result.skipped) console.log(`  skipped ${s.code}: ${s.url}`);
 }

@@ -103,13 +103,29 @@ describe('fetcher', () => {
     assert.equal(res.body, '<p>ok</p>');
   });
 
-  test('refuses pages larger than maxBytes', async () => {
+  test('truncates pages larger than maxBytes instead of dropping them', async () => {
     const fetcher = createFetcher({
       lookupImpl: publicDns,
       minIntervalMs: 0,
       maxBytes: 10,
       fetchImpl: async () =>
         new Response('x'.repeat(100), { status: 200, headers: { 'content-type': 'text/html' } }),
+    });
+    const res = await fetcher.fetchText('https://example.com/');
+    assert.equal(res.body, 'x'.repeat(10));
+    assert.equal(res.truncated, true);
+  });
+
+  test('refuses a page that declares an absurd size', async () => {
+    const fetcher = createFetcher({
+      lookupImpl: publicDns,
+      minIntervalMs: 0,
+      hardMaxBytes: 1000,
+      fetchImpl: async () =>
+        new Response('x', {
+          status: 200,
+          headers: { 'content-type': 'text/html', 'content-length': '5000' },
+        }),
     });
     await assert.rejects(fetcher.fetchText('https://example.com/'), { code: 'TOO_LARGE' });
   });
@@ -195,6 +211,27 @@ describe('scoreLink', () => {
     assert.ok(score('https://acme.com/login', 'Log in') < 0);
   });
 
+  test('ignores tracking query strings (seen on about.gitlab.com)', () => {
+    const trial =
+      'https://gitlab.com/-/trial_registrations/new?glm_content=default-saas-trial&glm_source=about.gitlab.com/jobs';
+    assert.ok(score(trial, 'Get free trial') < 0);
+  });
+
+  test('"handbook" alone is not enough to call a link a hiring link (seen on posthog.com)', () => {
+    assert.equal(
+      scoreLink({ url: 'https://posthog.com/handbook/values', text: 'Values' }).kind,
+      'about',
+    );
+    assert.equal(scoreLink({ url: 'https://posthog.com/handbook', text: 'Handbook' }).kind, null);
+    assert.equal(
+      scoreLink({
+        url: 'https://posthog.com/handbook/people/hiring-process',
+        text: 'Hiring process',
+      }).kind,
+      'hiring',
+    );
+  });
+
   test('classifies the link', () => {
     assert.equal(scoreLink({ url: 'https://acme.com/jobs', text: 'Jobs' }).kind, 'hiring');
     assert.equal(scoreLink({ url: 'https://acme.com/about', text: 'About' }).kind, 'about');
@@ -222,6 +259,17 @@ describe('extract', () => {
     assert.deepEqual(
       links.map((l) => l.url),
       ['https://acme.com/en/careers', 'https://acme.com/about'],
+    );
+  });
+
+  test('extractLinks strips tracking parameters so duplicates collapse', () => {
+    const links = extractLinks(
+      '<a href="/jobs?utm_source=x">Jobs</a><a href="/jobs?glm_source=y&team=eng">Eng jobs</a>',
+      'https://a.com/',
+    );
+    assert.deepEqual(
+      links.map((l) => l.url),
+      ['https://a.com/jobs', 'https://a.com/jobs?team=eng'],
     );
   });
 

@@ -183,6 +183,41 @@ describe('crawlCompany edge cases', () => {
   });
 });
 
+describe('choosing the hiring page (seen on posthog.com)', () => {
+  test('prefers the page describing the interview process over a thin index page', async () => {
+    const site = await startSite({
+      '/': page('PostHog', '<a href="/handbook">Handbook</a><a href="/careers">Careers</a>'),
+      '/handbook': page(
+        'Handbook',
+        '<p>Our handbook.</p><a href="/handbook/people/hiring-process">Hiring process</a>',
+      ),
+      '/careers': page('Careers', '<p>Open roles: Product Engineer.</p>'),
+      '/handbook/people/hiring-process': HOW_WE_HIRE,
+    });
+    try {
+      const result = await crawlCompany(`${site.origin}/`, makeDeps());
+      assert.equal(result.hiringPage, `${site.origin}/handbook/people/hiring-process`);
+      const handbook = result.pages.find((p) => p.url === `${site.origin}/handbook`);
+      assert.notEqual(handbook.kind, 'hiring');
+    } finally {
+      await site.close();
+    }
+  });
+
+  test('falls back to a careers page when no page describes the process', async () => {
+    const site = await startSite({
+      '/': page('Co', '<a href="/careers">Careers</a>'),
+      '/careers': page('Careers', '<p>Open roles: Product Engineer.</p>'),
+    });
+    try {
+      const result = await crawlCompany(`${site.origin}/`, makeDeps());
+      assert.equal(result.hiringPage, `${site.origin}/careers`);
+    } finally {
+      await site.close();
+    }
+  });
+});
+
 describe('isSameSite', () => {
   const start = new URL('https://about.gitlab.com/');
   test('accepts sibling subdomains and www', () => {

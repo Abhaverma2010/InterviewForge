@@ -34,7 +34,9 @@ const RULES = [
 
 // Pages that are never useful and often endless.
 const USELESS =
-  /\b(log ?in|sign ?(in|up)|register|account|privacy|terms|legal|cookies?|gdpr|pricing|cart|checkout|status|press kit|unsubscribe)\b/;
+  /\b(log ?in|sign ?(in|up)|regist(er|ers|ration|rations)|trials?|demo|contact sales|download|account|privacy|terms|legal|cookies?|gdpr|pricing|cart|checkout|status|press kit|unsubscribe)\b/;
+// Below this, hiring words are too weak ("handbook", "people") to call a link a hiring link.
+const STRONG_HIRING = 8;
 // Individual blog posts, tag pages and pagination dilute the crawl.
 const LOW_VALUE = /\b(blog|news|posts?|tags?|category|page \d+|events?|webinars?)\b/;
 
@@ -46,7 +48,8 @@ const LOW_VALUE = /\b(blog|news|posts?|tags?|category|page \d+|events?|webinars?
  */
 export function scoreLink(link, { pathPrefix = '/' } = {}) {
   const url = new URL(link.url);
-  const pathWords = words(decodeSafe(url.pathname + ' ' + url.search));
+  // Only the path: query strings are mostly tracking (?utm_source=...jobs) and mislead.
+  const pathWords = words(decodeSafe(url.pathname));
   const textWords = words(link.text);
   const haystack = `${pathWords} ${textWords}`;
 
@@ -67,12 +70,9 @@ export function scoreLink(link, { pathPrefix = '/' } = {}) {
   // shared host, pages outside that prefix may belong to someone else.
   if (!url.pathname.startsWith(pathPrefix)) score -= 4;
 
-  const kind =
-    totals.hiring === 0 && totals.about === 0
-      ? null
-      : totals.hiring >= totals.about
-        ? 'hiring'
-        : 'about';
+  let kind = null;
+  if (totals.hiring >= STRONG_HIRING && totals.hiring >= totals.about) kind = 'hiring';
+  else if (totals.about > 0) kind = 'about';
   return { score, kind };
 }
 
@@ -82,16 +82,23 @@ export function scoreLink(link, { pathPrefix = '/' } = {}) {
  * the interview process.
  */
 export function looksLikeHiringProcess(text) {
-  const signals = [
-    /interview (process|stages?|rounds?|loop)/i,
-    /\b(technical|coding|system design|behaviou?ral|onsite|on-site|final|phone|screening) (interview|round|screen)/i,
-    /\btake[- ]home\b/i,
-    /\b(hiring|recruitment|recruiting) process\b/i,
-    /\bhow we (hire|interview)\b/i,
-    /\b(recruiter|hiring manager) (call|screen|chat)\b/i,
-  ];
-  return signals.filter((s) => s.test(text)).length >= 2;
+  return hiringSignalCount(text) >= 2;
 }
+
+/** How many distinct hiring-process signals a page's text contains. */
+export function hiringSignalCount(text) {
+  return HIRING_SIGNALS.filter((signal) => signal.test(text)).length;
+}
+
+const HIRING_SIGNALS = [
+  /interview (process|stages?|rounds?|loop)/i,
+  /\b(technical|coding|system design|behaviou?ral|onsite|on-site|final|phone|screening) (interview|round|screen)/i,
+  /\btake[- ]home\b/i,
+  /\b(hiring|recruitment|recruiting) process\b/i,
+  /\bhow we (hire|interview)\b/i,
+  /\b(recruiter|hiring manager) (call|screen|chat|interview)\b/i,
+  /\b(pair programming|code review|technical) (exercise|task|challenge|session)\b/i,
+];
 
 // "/company/how-we_hire" → "company how we hire"
 function words(text) {

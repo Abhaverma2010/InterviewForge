@@ -1,7 +1,8 @@
 // Fetches one page from the open web, defensively:
 //   - every URL, including every redirect hop, passes validateUrl()
 //   - per-host politeness delay, so we never hammer a site
-//   - timeout, size cap and content-type allow-list
+//   - timeout, content-type allow-list, and a size cap: pages are read up to
+//     maxBytes and truncated; anything declaring more than hardMaxBytes is refused
 //   - retries with backoff on 429 / 5xx / network errors, never on 4xx
 // Failures are thrown as FetchError with a stable code.
 
@@ -15,7 +16,8 @@ export function createFetcher({
   allowPrivate = false,
   userAgent = 'InterviewForgeBot/0.1 (+https://github.com/Abhaverma2010/InterviewForge)',
   timeoutMs = 10_000,
-  maxBytes = 2_000_000,
+  maxBytes = 5_000_000,
+  hardMaxBytes = 50_000_000,
   maxRedirects = 5,
   retries = 2,
   minIntervalMs = 500,
@@ -38,7 +40,7 @@ export function createFetcher({
    * @param {string | URL} input
    * @param {object} [opts]
    * @param {string[]} [opts.accept]  allowed content types
-   * @returns {Promise<{ url: string, status: number, contentType: string, body: string }>}
+   * @returns {Promise<{ url: string, status: number, contentType: string, body: string, truncated: boolean }>}
    */
   async function fetchText(input, { accept = HTML_TYPES } = {}) {
     let url = await validateUrl(input, { allowPrivate, lookupImpl });
@@ -82,8 +84,8 @@ export function createFetcher({
         });
       }
 
-      const body = await readCapped(res, url);
-      return { url: url.href, status: res.status, contentType, body };
+      const { body, truncated } = await readCapped(res, url);
+      return { url: url.href, status: res.status, contentType, body, truncated };
     }
   }
 
@@ -126,34 +128,36 @@ export function createFetcher({
     }
   }
 
+  // Reads at most maxBytes. Some real pages (framework-heavy careers pages)
+  // exceed a few MB of HTML; the readable content is usually near the top, so
+  // truncating keeps them useful while bounding memory.
   async function readCapped(res, url) {
     const declared = Number(res.headers.get('content-length'));
-    if (declared > maxBytes) {
+    if (declared > hardMaxBytes) {
       await res.body?.cancel();
-      throw tooLarge(url);
+      throw new FetchError('TOO_LARGE', `Page declares ${declared} bytes: ${url.href}`, {
+        url: url.href,
+      });
     }
-    if (!res.body) return '';
+    if (!res.body) return { body: '', truncated: false };
 
     const reader = res.body.getReader();
     const chunks = [];
     let total = 0;
+    let truncated = false;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) {
+      if (total + value.byteLength > maxBytes) {
+        chunks.push(value.subarray(0, maxBytes - total));
+        truncated = true;
         await reader.cancel();
-        throw tooLarge(url);
+        break;
       }
       chunks.push(value);
+      total += value.byteLength;
     }
-    return new TextDecoder('utf-8').decode(Buffer.concat(chunks));
-  }
-
-  function tooLarge(url) {
-    return new FetchError('TOO_LARGE', `Page larger than ${maxBytes} bytes: ${url.href}`, {
-      url: url.href,
-    });
+    return { body: new TextDecoder('utf-8').decode(Buffer.concat(chunks)), truncated };
   }
 
   return { fetchText, userAgent };

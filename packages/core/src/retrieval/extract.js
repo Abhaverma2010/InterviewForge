@@ -6,6 +6,9 @@ import * as cheerio from 'cheerio';
 const SKIPPED_EXTENSIONS =
   /\.(pdf|png|jpe?g|gif|svg|webp|ico|zip|gz|mp4|mp3|webm|css|js|mjs|json|xml|rss|woff2?|ttf)$/i;
 
+// Analytics parameters: the same page with different ones is still the same page.
+const TRACKING_PARAM = /^(utm_\w+|glm_\w+|gclid|fbclid|mc_cid|mc_eid|ref|source)$/i;
+
 const NON_CONTENT = [
   'script',
   'style',
@@ -55,6 +58,9 @@ export function extractLinks(html, pageUrl) {
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
     if (SKIPPED_EXTENSIONS.test(url.pathname)) return;
     url.hash = '';
+    for (const key of [...url.searchParams.keys()]) {
+      if (TRACKING_PARAM.test(key)) url.searchParams.delete(key);
+    }
 
     const text = collapse(
       [$(el).text(), $(el).attr('aria-label'), $(el).attr('title')].filter(Boolean).join(' '),

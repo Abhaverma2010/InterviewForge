@@ -8,7 +8,7 @@
 
 import { extractLinks, extractPageContent } from './extract.js';
 import { FetchError } from './errors.js';
-import { looksLikeHiringProcess, scoreLink } from './link-scoring.js';
+import { hiringSignalCount, scoreLink } from './link-scoring.js';
 
 /**
  * @typedef {object} CrawledPage
@@ -18,6 +18,7 @@ import { looksLikeHiringProcess, scoreLink } from './link-scoring.js';
  * @property {string} title
  * @property {string} description
  * @property {string} text
+ * @property {number} hiringSignals  hiring-process phrases found in the text
  *
  * @typedef {object} CrawlResult
  * @property {string} startUrl
@@ -85,7 +86,7 @@ export async function crawlCompany(
     await visit(frontier.shift());
   }
 
-  result.hiringPage = result.pages.find((p) => p.kind === 'hiring')?.url ?? null;
+  result.hiringPage = bestHiringPage(result.pages)?.url ?? null;
   result.aboutPage = result.pages.find((p) => p.kind === 'about')?.url ?? null;
   return result;
 
@@ -118,10 +119,12 @@ export async function crawlCompany(
     }
 
     const content = extractPageContent(response.body);
+    const hiringSignals = hiringSignalCount(content.text);
+    // The link text is a guess; the page's own content decides.
     let kind = candidate.kind ?? 'other';
-    if (kind !== 'home' && looksLikeHiringProcess(content.text)) kind = 'hiring';
+    if (kind !== 'home' && hiringSignals >= 2) kind = 'hiring';
 
-    const page = { url: response.url, kind, depth: candidate.depth, ...content };
+    const page = { url: response.url, kind, depth: candidate.depth, hiringSignals, ...content };
     result.pages.push(page);
     onEvent({ type: 'page', url: page.url, kind });
 
@@ -148,6 +151,24 @@ export async function crawlCompany(
     result.skipped.push({ url, code, message });
     onEvent({ type: 'skipped', url, code });
   }
+}
+
+/**
+ * The page that best describes how the company hires: most hiring-process
+ * phrases first, then pages reached through hiring links (e.g. a careers page
+ * listing roles), then crawl order. Null when nothing looks hiring-related.
+ */
+function bestHiringPage(pages) {
+  const candidates = pages.filter((p) => p.hiringSignals >= 2 || p.kind === 'hiring');
+  return candidates.reduce(
+    (best, p) =>
+      !best ||
+      p.hiringSignals > best.hiringSignals ||
+      (p.hiringSignals === best.hiringSignals && p.kind === 'hiring' && best.kind !== 'hiring')
+        ? p
+        : best,
+    null,
+  );
 }
 
 /**
