@@ -12,10 +12,7 @@
 const REVIEW_QUESTIONS_PER_DAY = 4;
 const EMPTY_KIT_MINUTES = 30;
 
-// ─── Your part ──────────────────────────────────────────────────────────────
-// Fill in the three functions below, then run `npm test` from the repo root.
-// The tests in packages/core/test/schedule.test.js describe exactly what each
-// one must do. Delete the `throw` line when you start on a function.
+// ─── Building blocks ────────────────────────────────────────────────────────
 
 /**
  * How many minutes to spend on one question.
@@ -26,7 +23,7 @@ const EMPTY_KIT_MINUTES = 30;
  * @returns {number} an integer
  */
 export function questionCost(question) {
-  throw new Error('TODO: questionCost');
+  return 10 + 10 * question.difficulty;
 }
 
 /**
@@ -34,19 +31,18 @@ export function questionCost(question) {
  *   1. questions covering a must-have requirement come before the rest
  *   2. within each group, higher difficulty comes first
  *   3. otherwise keep the original order
- * Must not change the array it was given.
- *
- * Hints:
- *   - isMustHave(question, requirementsById) is written for you below.
- *   - [...questions] makes a copy. Array.prototype.sort is stable, so equal
- *     items keep their original order automatically.
- *   - A sort comparator returns a negative number to put `a` first.
+ * Must not change the array it was given (sort() is stable, which gives rule 3).
  *
  * @param {Array<{ id: string, requirement_ids: string[], difficulty: number }>} questions
  * @param {Map<string, { priority: 'must' | 'nice' }>} requirementsById
  */
 export function sortForSchedule(questions, requirementsById) {
-  throw new Error('TODO: sortForSchedule');
+  return [...questions].sort((a, b) => {
+    // true - false === 1, so a must-have `b` sorts ahead of a nice-to-have `a`.
+    const byPriority = isMustHave(b, requirementsById) - isMustHave(a, requirementsById);
+    if (byPriority !== 0) return byPriority;
+    return b.difficulty - a.difficulty;
+  });
 }
 
 /**
@@ -56,21 +52,26 @@ export function sortForSchedule(questions, requirementsById) {
  *   2 items, 4 days → sizes [1, 1, 0, 0]
  * Keeps the items in order.
  *
- * Hints:
- *   - Math.floor(items.length / dayCount) is the base size.
- *   - items.length % dayCount of the days get one extra.
- *   - items.slice(start, end) takes a group without changing `items`.
- *
  * @template T
  * @param {T[]} items
  * @param {number} dayCount
  * @returns {T[][]}
  */
 export function splitIntoDays(items, dayCount) {
-  throw new Error('TODO: splitIntoDays');
+  const baseSize = Math.floor(items.length / dayCount);
+  const daysWithExtra = items.length % dayCount;
+
+  const groups = [];
+  let start = 0;
+  for (let i = 0; i < dayCount; i++) {
+    const size = baseSize + (i < daysWithExtra ? 1 : 0);
+    groups.push(items.slice(start, start + size));
+    start += size;
+  }
+  return groups;
 }
 
-// ─── Glue (written for you) ─────────────────────────────────────────────────
+// ─── Schedule ──────────────────────────────────────────────────────────────
 
 /**
  * @param {object} input
@@ -143,5 +144,7 @@ function sumCost(questions) {
 // "Technical + Behavioural": the categories covered that day, in order.
 function focusFor(questions) {
   const categories = [...new Set(questions.map((q) => q.category))];
-  return categories.map((c) => c.charAt(0).toUpperCase() + c.slice(1).replace('-', ' ')).join(' + ');
+  return categories
+    .map((c) => c.charAt(0).toUpperCase() + c.slice(1).replace('-', ' '))
+    .join(' + ');
 }
