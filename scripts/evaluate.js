@@ -38,7 +38,17 @@ if (!Array.isArray(cases)) {
 const crawler = createCrawlerDeps({ allowPrivate: process.env.ALLOW_PRIVATE_URLS !== 'false' });
 let llm;
 try {
-  llm = createLLMClientFromEnv();
+  llm = createLLMClientFromEnv(process.env, {
+    // Make waiting visible: free tiers throttle hard, and a silent retry looks like a hang.
+    onEvent: (e) => {
+      const seconds = Math.round(e.delayMs / 1000);
+      if (e.type === 'retry') {
+        console.log(`  [llm] ${e.reason}, retry ${e.attempt} in ${seconds}s`);
+      } else if (e.type === 'throttle' && seconds >= 2) {
+        console.log(`  [llm] pacing requests to stay under the rate limit, waiting ${seconds}s`);
+      }
+    },
+  });
 } catch (err) {
   console.error(`${err.message} See .env.example.`);
   process.exit(1);

@@ -25,6 +25,7 @@ export function createLLMClient({
   fetchImpl = fetch,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now = Date.now,
+  onEvent = () => {},
 }) {
   if (!baseUrl || !apiKey || !model) {
     throw new LLMError('LLM_CONFIG', 'LLM_BASE_URL, LLM_API_KEY and LLM_MODEL must all be set.');
@@ -34,7 +35,12 @@ export function createLLMClient({
     throw new LLMError('LLM_CONFIG', `LLM_BASE_URL is not a valid http(s) URL: ${baseUrl}`);
   }
 
-  const limiter = createRateLimiter({ requestsPerMinute, sleep, now });
+  const limiter = createRateLimiter({
+    requestsPerMinute,
+    sleep,
+    now,
+    onWait: (delayMs) => onEvent({ type: 'throttle', delayMs }),
+  });
 
   // One HTTP round trip, retried on transient failures. Returns the reply text.
   async function complete(messages, { temperature }) {
@@ -61,7 +67,14 @@ export function createLLMClient({
             cause: err,
           });
         }
-        await sleep(backoffDelay(attempt, null));
+        const delayMs = backoffDelay(attempt, null);
+        onEvent({
+          type: 'retry',
+          reason: err.name === 'TimeoutError' ? 'timeout' : 'network error',
+          attempt: attempt + 1,
+          delayMs,
+        });
+        await sleep(delayMs);
         continue;
       }
 
@@ -92,7 +105,9 @@ export function createLLMClient({
           { status: res.status, body: body.slice(0, 500) },
         );
       }
-      await sleep(backoffDelay(attempt, retryAfterMs(res, body)));
+      const delayMs = backoffDelay(attempt, retryAfterMs(res, body));
+      onEvent({ type: 'retry', reason: `HTTP ${res.status}`, attempt: attempt + 1, delayMs });
+      await sleep(delayMs);
     }
   }
 

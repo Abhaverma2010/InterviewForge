@@ -148,3 +148,19 @@ test('rate limiter spaces out requests beyond the per-minute budget', async () =
   await client.chatJson({ system: 's', user: 'u', schema });
   assert.deepEqual(sleeps, [60000]);
 });
+
+test('reports retries and throttling through onEvent', async () => {
+  const events = [];
+  let clock = 0;
+  const { client } = makeClient([failure(503), reply('{"answer": 1}'), reply('{"answer": 2}')], {
+    requestsPerMinute: 2,
+    onEvent: (e) => events.push(e.type),
+    now: () => clock,
+    sleep: async (ms) => {
+      clock += ms;
+    },
+  });
+  await client.chatJson({ system: 's', user: 'u', schema });
+  await client.chatJson({ system: 's', user: 'u', schema });
+  assert.deepEqual(events, ['retry', 'throttle']);
+});
