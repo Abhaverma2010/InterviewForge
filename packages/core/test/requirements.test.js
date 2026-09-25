@@ -191,6 +191,14 @@ describe('anchoring helpers', () => {
     assert.equal(findAnchor('10 years of Rust', lines), null);
   });
 
+  test('a bracketed "preferred" applies only to what is inside the brackets', () => {
+    const posting = ['Requirements', '- Experience with Python (Django preferred)'];
+    const evidence = 'Experience with Python (Django preferred)';
+    assert.equal(priorityFromPosting(posting, 1, evidence, 'Experience with Python'), 'must');
+    assert.equal(priorityFromPosting(posting, 1, evidence, 'Experience with Django'), 'nice');
+    assert.equal(priorityFromPosting(posting, 1, 'Django preferred', 'Django'), 'nice');
+  });
+
   test('priorityFromPosting returns null when the posting is silent', () => {
     assert.equal(priorityFromPosting(['We use Go.'], 0, 'We use Go.'), null);
   });

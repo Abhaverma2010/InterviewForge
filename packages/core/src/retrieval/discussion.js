@@ -15,6 +15,19 @@ import { FetchError } from './errors.js';
 const HN_SEARCH = 'https://hn.algolia.com/api/v1/search';
 const INTERVIEW_WORDS =
   /\b(interview(s|ed|ing|er)?|hiring|recruit(er|ing|ment)?|take[- ]home|onsite|on-site|offer|leetcode|coding (test|challenge|exercise)|system design)\b/i;
+// Phrases that are clearly about a candidate's hiring experience. A hit needs
+// at least one; results are ranked by how many distinct ones they contain.
+const HIRING_EXPERIENCE = [
+  /\binterview(ed|ing)? (at|with|for)\b/i,
+  /\b(interview|hiring) (process|loop|stages?|rounds?)\b/i,
+  /\b(technical|coding|system design|behaviou?ral|final|phone|onsite|on-site) (interview|round|screen)\b/i,
+  /\b(take[- ]home|work trial|trial (work )?day|super ?day|paid trial)\b/i,
+  /\b(recruiter|hiring manager)\b/i,
+  /\b(got|received|accepted|declined|rejected) (an |the )?offer\b|\brejection\b/i,
+  /\b(leetcode|coding (test|challenge|exercise)|pair programming)\b/i,
+];
+// "User interviews" and friends are product research, not hiring.
+const NOT_HIRING = /\b(user|customer|podcast|press|media|founder) interviews?\b/gi;
 
 /**
  * @typedef {object} DiscussionResult
@@ -57,18 +70,24 @@ export async function searchPublicDiscussion(companyName, { fetcher }, { maxResu
     throw err;
   }
 
+  // Algolia matches loosely; keep only hits that name the company AND describe
+  // a hiring experience, so "Stripe" doesn't return every post about stripes
+  // and "user interviews" doesn't count. Best-matching first.
   const seen = new Set();
+  const scored = [];
   for (const hit of data?.hits ?? []) {
     const item = toResult(hit);
     if (!item || seen.has(item.url)) continue;
-    // Algolia matches loosely; keep only hits that name the company AND talk
-    // about hiring, so "Stripe" doesn't return every post about stripes.
-    const haystack = `${item.title} ${item.excerpt}`;
-    if (!mentions(haystack, companyName) || !INTERVIEW_WORDS.test(haystack)) continue;
     seen.add(item.url);
-    result.results.push(item);
-    if (result.results.length >= maxResults) break;
+    const haystack = `${item.title} ${item.fullText}`.replace(NOT_HIRING, ' ');
+    if (!mentions(haystack, companyName)) continue;
+    const relevance = HIRING_EXPERIENCE.filter((p) => p.test(haystack)).length;
+    if (relevance === 0) continue;
+    const { fullText, ...rest } = item;
+    scored.push({ ...rest, relevance });
   }
+  scored.sort((a, b) => b.relevance - a.relevance);
+  result.results = scored.slice(0, maxResults).map(({ relevance, ...rest }) => rest);
   return result;
 }
 
@@ -79,6 +98,7 @@ function toResult(hit) {
     url: `https://news.ycombinator.com/item?id=${hit.objectID}`,
     title: hit.title ?? hit.story_title ?? '',
     excerpt: excerptAround(body, INTERVIEW_WORDS, 600),
+    fullText: body,
     date: hit.created_at ?? '',
   };
 }

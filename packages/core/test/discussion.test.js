@@ -48,6 +48,34 @@ describe('searchPublicDiscussion', () => {
     assert.match(fetcher.urls[0], /hn\.algolia\.com.*query=PostHog\+interview/);
   });
 
+  test('ignores "user interviews" and ranks hiring experiences first (seen for PostHog)', async () => {
+    const fetcher = fakeFetcher(() =>
+      hits([
+        {
+          objectID: '10',
+          story_title: 'Making PostHog insights quicker with LLMs?',
+          comment_text: 'We run user interviews and PostHog to understand cohorts.',
+        },
+        {
+          objectID: '11',
+          story_title: 'Things we have learned',
+          comment_text: 'I interviewed at PostHog. The SuperDay is a paid trial day.',
+        },
+        {
+          objectID: '12',
+          story_title: 'Things we have learned',
+          comment_text:
+            'PostHog interview process: recruiter call, technical interview, then a SuperDay.',
+        },
+      ]),
+    );
+    const result = await searchPublicDiscussion('PostHog', { fetcher });
+    assert.deepEqual(
+      result.results.map((r) => r.url.split('=')[1]),
+      ['12', '11'],
+    );
+  });
+
   test('finding nothing is a normal, empty result', async () => {
     const result = await searchPublicDiscussion('Obscure Co', {
       fetcher: fakeFetcher(() => hits([])),
@@ -75,7 +103,7 @@ describe('searchPublicDiscussion', () => {
   test('respects maxResults', async () => {
     const many = Array.from({ length: 20 }, (_, i) => ({
       objectID: String(i),
-      title: `Acme interview story ${i}`,
+      title: `Acme interview process story ${i}`,
     }));
     const result = await searchPublicDiscussion(
       'Acme',

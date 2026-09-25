@@ -122,7 +122,7 @@ export function verifyExtraction(raw, jd) {
     if (seenTexts.has(key)) continue;
     seenTexts.add(key);
 
-    const marked = priorityFromPosting(lines, anchor.line, req.evidence);
+    const marked = priorityFromPosting(lines, anchor.line, req.evidence, req.text);
     kept.push({
       text: req.text.trim(),
       kind: req.kind,
@@ -215,15 +215,16 @@ const MUST_MARKERS =
   /\b(required|requirements?|must|minimum|essential|mandatory|you will need|you('ll| will)? have|what you bring|qualifications)\b/i;
 
 /**
- * Looks, in order, at: the sentence the evidence sits in, a "Label:" at the
- * start of its line, and the nearest heading above it. The first one that
- * marks the requirement as required or optional decides.
+ * Looks, in order, at: the part of the sentence about this requirement, a
+ * "Label:" at the start of its line, and the nearest heading above it. The
+ * first one that marks the requirement as required or optional decides.
  * Returns 'must', 'nice' or null when the posting doesn't say.
  */
-export function priorityFromPosting(lines, lineIndex, evidence) {
+export function priorityFromPosting(lines, lineIndex, evidence, requirementText = evidence) {
   const line = lines[lineIndex] ?? '';
+  const sentence = sentenceContaining(line, evidence);
   const scopes = [
-    sentenceContaining(line, evidence),
+    sentence && ownScope(sentence, requirementText),
     labelOf(line),
     headingAbove(lines, lineIndex),
   ];
@@ -239,6 +240,41 @@ function sentenceContaining(line, evidence) {
   const sentences = line.split(/(?<=[.;!?])\s+/);
   const target = normalise(evidence);
   return sentences.find((s) => normalise(s).includes(target)) ?? null;
+}
+
+/**
+ * The part of a sentence that talks about one requirement. A bracketed aside
+ * qualifies only what is inside it:
+ *   "Experience with Python (Django preferred)"
+ *     Python → "Experience with Python "   (not preferred: must)
+ *     Django → "Django preferred"          (nice)
+ */
+function ownScope(sentence, requirementText) {
+  const asides = [...sentence.matchAll(/\(([^)]*)\)/g)].map((m) => m[1]);
+  const distinctive = distinctiveWords(requirementText);
+  if (distinctive.length) {
+    const aside = asides.find((a) => {
+      const words = new Set(normalise(a).split(' '));
+      return distinctive.every((w) => words.has(w));
+    });
+    if (aside) return aside;
+  }
+  return sentence.replace(/\([^)]*\)/g, ' ');
+}
+
+const GENERIC_WORDS = new Set(
+  (
+    'experience experienced with strong solid good great deep knowledge of in on and or the a an ' +
+    'years year skills skill working work comfortable familiarity familiar proficiency proficient ' +
+    'using use understanding ability to background hands professional building build'
+  ).split(' '),
+);
+
+// "Strong experience with React" → ["react"]
+function distinctiveWords(text) {
+  return normalise(text)
+    .split(' ')
+    .filter((w) => w.length > 1 && !GENERIC_WORDS.has(w) && !/^\d+\+?$/.test(w));
 }
 
 // "Bonus: experience with Next.js" → "Bonus"
