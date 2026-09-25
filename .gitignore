@@ -5,7 +5,7 @@ node_modules/
 .env.local
 .next/
 dist/
-coverage/
+/coverage/
 *.log
 .DS_Store
 
