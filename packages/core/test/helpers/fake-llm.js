@@ -107,6 +107,11 @@ export function createFakeLlm({
 export async function startFakeLlmServer(options) {
   const fake = createFakeLlm(options);
   const server = http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url.endsWith('/models')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ data: [{ id: 'models/fake' }] }));
+      return;
+    }
     let body = '';
     for await (const chunk of req) body += chunk;
     const { messages } = JSON.parse(body);
