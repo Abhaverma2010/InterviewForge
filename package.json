@@ -17,6 +17,7 @@
     "crawl": "node scripts/crawl.js",
     "research": "node scripts/research.js",
     "dev:api": "npm run dev -w @interviewforge/api",
-    "test": "npm run test --workspaces --if-present && node --test \"test/**/*.test.js\""
+    "test": "npm run test --workspaces --if-present && node --test \"test/**/*.test.js\"",
+    "models": "node scripts/list-models.js"
   }
 }

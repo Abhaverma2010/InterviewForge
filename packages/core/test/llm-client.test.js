@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
-import { createLLMClient, parseAndValidate } from '../src/llm/client.js';
+import { createLLMClient, createLLMClientFromEnv, parseAndValidate } from '../src/llm/client.js';
 
 // A fake fetch that plays back scripted responses and records the requests.
 function scriptedFetch(responses) {
@@ -163,4 +163,82 @@ test('reports retries and throttling through onEvent', async () => {
   await client.chatJson({ system: 's', user: 'u', schema });
   await client.chatJson({ system: 's', user: 'u', schema });
   assert.deepEqual(events, ['retry', 'throttle']);
+});
+
+// ─── Fallback models ─────────────────────────────────────────────────────────
+
+test('fails over to the fallback model when the primary stays overloaded', async () => {
+  const events = [];
+  const { client, calls } = makeClient(
+    [failure(503), failure(503), failure(503), reply('{"answer": 8}')],
+    {
+      fallbacks: [{ model: 'backup-model' }],
+      failoverRetries: 2,
+      onEvent: (e) => events.push(e),
+    },
+  );
+  assert.deepEqual(await client.chatJson({ system: 's', user: 'u', schema }), { answer: 8 });
+  assert.deepEqual(
+    calls.map((c) => c.body.model),
+    ['test-model', 'test-model', 'test-model', 'backup-model'],
+  );
+  const failover = events.find((e) => e.type === 'failover');
+  assert.deepEqual(
+    { from: failover.from, to: failover.to, reason: failover.reason },
+    { from: 'test-model', to: 'backup-model', reason: 'LLM_UNAVAILABLE' },
+  );
+});
+
+test('a used-up daily quota fails over at once, without retrying', async () => {
+  const quota = JSON.stringify([
+    {
+      error: {
+        code: 429,
+        details: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }],
+      },
+    },
+  ]);
+  const { client, calls, sleeps } = makeClient([failure(429, quota), reply('{"answer": 9}')], {
+    fallbacks: [{ model: 'backup-model' }],
+  });
+  assert.deepEqual(await client.chatJson({ system: 's', user: 'u', schema }), { answer: 9 });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(sleeps, []);
+});
+
+test('a failed primary cools down, so the next call goes straight to the fallback', async () => {
+  const { client, calls } = makeClient(
+    [failure(503), failure(503), failure(503), reply('{"answer": 1}'), reply('{"answer": 2}')],
+    { fallbacks: [{ model: 'backup-model' }], failoverRetries: 2 },
+  );
+  await client.chatJson({ system: 's', user: 'u', schema });
+  await client.chatJson({ system: 's', user: 'u', schema });
+  assert.deepEqual(calls.map((c) => c.body.model).slice(-2), ['backup-model', 'backup-model']);
+});
+
+test('without a fallback, a daily quota error is reported clearly', async () => {
+  const { client } = makeClient([failure(429, 'Quota exceeded: requests per day')]);
+  await assert.rejects(client.chatJson({ system: 's', user: 'u', schema }), {
+    code: 'LLM_QUOTA_EXHAUSTED',
+  });
+});
+
+test('invalid JSON is not a reason to fail over', async () => {
+  const { client, calls } = makeClient([reply('nope'), reply('still nope')], {
+    fallbacks: [{ model: 'backup-model' }],
+  });
+  await assert.rejects(client.chatJson({ system: 's', user: 'u', schema }), {
+    code: 'LLM_INVALID_JSON',
+  });
+  assert.ok(calls.every((c) => c.body.model === 'test-model'));
+});
+
+test('createLLMClientFromEnv reads the fallback settings', () => {
+  const client = createLLMClientFromEnv({
+    LLM_BASE_URL: 'https://a.test/v1',
+    LLM_API_KEY: 'k',
+    LLM_MODEL: 'primary',
+    LLM_FALLBACK_MODEL: 'backup',
+  });
+  assert.deepEqual(client.models, ['primary', 'backup']);
 });

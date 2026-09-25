@@ -43,7 +43,9 @@ try {
     onEvent: (e) => {
       const seconds = Math.round(e.delayMs / 1000);
       if (e.type === 'retry') {
-        console.log(`  [llm] ${e.reason}, retry ${e.attempt} in ${seconds}s`);
+        console.log(`  [llm] ${e.model}: ${e.reason}, retry ${e.attempt} in ${seconds}s`);
+      } else if (e.type === 'failover') {
+        console.log(`  [llm] ${e.from} unavailable (${e.reason}), switching to ${e.to}`);
       } else if (e.type === 'throttle' && seconds >= 2) {
         console.log(`  [llm] pacing requests to stay under the rate limit, waiting ${seconds}s`);
       }
@@ -54,6 +56,7 @@ try {
   process.exit(1);
 }
 
+console.log(`Models: ${llm.models.join(' → fallback ')}. Running ${cases.length} case(s).\n`);
 const started = Date.now();
 const results = new Array(cases.length);
 let next = 0;
