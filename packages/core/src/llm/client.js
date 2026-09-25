@@ -53,7 +53,9 @@ export function createLLMClient({
       } catch (err) {
         // Network failure or timeout: treat like a 503.
         if (attempt >= maxRetries) {
-          throw new LLMError('LLM_UNAVAILABLE', `LLM request failed: ${err.message}`, { cause: err });
+          throw new LLMError('LLM_UNAVAILABLE', `LLM request failed: ${err.message}`, {
+            cause: err,
+          });
         }
         await sleep(backoffDelay(attempt, null));
         continue;
@@ -70,10 +72,14 @@ export function createLLMClient({
 
       const body = await res.text();
       if (!RETRYABLE_STATUS.has(res.status)) {
-        throw new LLMError(errorCodeFor(res.status), `LLM request failed with HTTP ${res.status}.`, {
-          status: res.status,
-          body: body.slice(0, 500),
-        });
+        throw new LLMError(
+          errorCodeFor(res.status),
+          `LLM request failed with HTTP ${res.status}.`,
+          {
+            status: res.status,
+            body: body.slice(0, 500),
+          },
+        );
       }
       if (attempt >= maxRetries) {
         throw new LLMError(
@@ -130,7 +136,10 @@ export function createLLMClient({
     const secondResult = parseAndValidate(repaired, schema);
     if (secondResult.ok) return secondResult.value;
 
-    throw new LLMError('LLM_INVALID_JSON', `LLM returned invalid output twice: ${secondResult.error}`);
+    throw new LLMError(
+      'LLM_INVALID_JSON',
+      `LLM returned invalid output twice: ${secondResult.error}`,
+    );
   }
 
   return { chatJson, model };

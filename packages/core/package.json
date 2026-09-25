@@ -9,9 +9,10 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "zod": "^4.6.5"
   }
 }

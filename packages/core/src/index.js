@@ -2,3 +2,4 @@
 // scripts/evaluate.js import from here, so there is one implementation.
 export { createLLMClient, createLLMClientFromEnv } from './llm/client.js';
 export { LLMError } from './llm/errors.js';
+export * from './retrieval/index.js';
