@@ -3,3 +3,5 @@
 export { createLLMClient, createLLMClientFromEnv } from './llm/client.js';
 export { LLMError } from './llm/errors.js';
 export * from './retrieval/index.js';
+export { extractRequirements } from './extraction/requirements.js';
+export { buildSchedule } from './scheduling/schedule.js';

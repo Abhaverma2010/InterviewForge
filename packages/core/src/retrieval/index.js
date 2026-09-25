@@ -12,3 +12,5 @@ export function createCrawlerDeps(fetcherOptions = {}) {
   const fetcher = createFetcher(fetcherOptions);
   return { fetcher, robots: createRobotsCache(fetcher) };
 }
+export { searchPublicDiscussion } from './discussion.js';
+export { guessCompanyName } from './company-name.js';

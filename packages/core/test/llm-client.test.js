@@ -118,6 +118,15 @@ test('fails with LLM_INVALID_JSON when the repair is also invalid', async () => 
   });
 });
 
+test('rejects missing or malformed configuration up front', () => {
+  assert.throws(() => createLLMClient({ baseUrl: '', apiKey: 'k', model: 'm' }), {
+    code: 'LLM_CONFIG',
+  });
+  assert.throws(() => createLLMClient({ baseUrl: 'not a url', apiKey: 'k', model: 'm' }), {
+    code: 'LLM_CONFIG',
+  });
+});
+
 test('parseAndValidate strips a ```json fence', () => {
   assert.deepEqual(parseAndValidate('```json\n{"answer": 7}\n```', schema), {
     ok: true,

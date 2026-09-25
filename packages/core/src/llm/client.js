@@ -29,6 +29,10 @@ export function createLLMClient({
   if (!baseUrl || !apiKey || !model) {
     throw new LLMError('LLM_CONFIG', 'LLM_BASE_URL, LLM_API_KEY and LLM_MODEL must all be set.');
   }
+  // A malformed base URL would otherwise surface as a "network error" and be retried.
+  if (!URL.canParse(baseUrl) || !/^https?:$/.test(new URL(baseUrl).protocol)) {
+    throw new LLMError('LLM_CONFIG', `LLM_BASE_URL is not a valid http(s) URL: ${baseUrl}`);
+  }
 
   const limiter = createRateLimiter({ requestsPerMinute, sleep, now });
 

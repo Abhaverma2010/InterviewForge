@@ -4,7 +4,7 @@
 import * as cheerio from 'cheerio';
 
 const SKIPPED_EXTENSIONS =
-  /\.(pdf|png|jpe?g|gif|svg|webp|ico|zip|gz|mp4|mp3|webm|css|js|mjs|json|xml|rss|woff2?|ttf)$/i;
+  /\.(pdf|png|jpe?g|gif|svg|webp|ico|zip|gz|mp4|mp3|webm|css|js|mjs|json|xml|ya?ml|rss|woff2?|ttf)$/i;
 
 // Analytics parameters: the same page with different ones is still the same page.
 const TRACKING_PARAM = /^(utm_\w+|glm_\w+|gclid|fbclid|mc_cid|mc_eid|ref|source)$/i;
@@ -77,12 +77,13 @@ export function extractLinks(html, pageUrl) {
 /**
  * The page's readable content.
  *
- * @returns {{ title: string, description: string, text: string, truncated: boolean }}
+ * @returns {{ title: string, description: string, siteName: string, text: string, truncated: boolean }}
  */
 export function extractPageContent(html, { maxChars = 15_000 } = {}) {
   const $ = cheerio.load(html);
   const title = collapse($('title').first().text()) || collapse($('h1').first().text());
   const description = collapse($('meta[name="description"]').attr('content') ?? '');
+  const siteName = collapse($('meta[property="og:site_name"]').attr('content') ?? '');
 
   $(NON_CONTENT).remove();
   const main = $('main').first();
@@ -100,6 +101,7 @@ export function extractPageContent(html, { maxChars = 15_000 } = {}) {
   return {
     title,
     description,
+    siteName,
     text: text.length > maxChars ? text.slice(0, maxChars) : text,
     truncated: text.length > maxChars,
   };

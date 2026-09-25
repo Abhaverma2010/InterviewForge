@@ -1,0 +1,18 @@
+Product Engineer — PostHog
+Location: Remote (US/EU time zones)
+
+What you'll do
+- Own features end to end, from talking to users to shipping code
+- Work across our React frontend and Python/Django backend
+- Help debug customer issues in production
+
+Requirements
+- 3+ years of professional software engineering experience
+- Strong experience with React and TypeScript
+- Experience with Python (Django preferred)
+- Comfortable working with SQL and large datasets
+- Clear written communication; we are a remote, async company
+
+Nice to have
+- Experience with ClickHouse
+- You've built or run a startup before

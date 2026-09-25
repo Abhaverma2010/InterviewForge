@@ -15,6 +15,7 @@
     "setup": "node scripts/setup-env.js",
     "evaluate": "node scripts/evaluate.js",
     "crawl": "node --env-file-if-exists=.env scripts/crawl.js",
+    "research": "node --env-file-if-exists=.env scripts/research.js",
     "dev:api": "npm run dev -w @interviewforge/api",
     "test": "npm run test --workspaces --if-present"
   }
