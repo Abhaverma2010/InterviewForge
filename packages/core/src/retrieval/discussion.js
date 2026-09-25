@@ -12,7 +12,8 @@
 import * as cheerio from 'cheerio';
 import { FetchError } from './errors.js';
 
-const HN_SEARCH = 'https://hn.algolia.com/api/v1/search';
+// Overridable so tests and offline runs can point at a local stand-in.
+const HN_SEARCH = process.env.DISCUSSION_SEARCH_URL || 'https://hn.algolia.com/api/v1/search';
 const INTERVIEW_WORDS =
   /\b(interview(s|ed|ing|er)?|hiring|recruit(er|ing|ment)?|take[- ]home|onsite|on-site|offer|leetcode|coding (test|challenge|exercise)|system design)\b/i;
 // Phrases that are clearly about a candidate's hiring experience. A hit needs

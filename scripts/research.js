@@ -1,6 +1,7 @@
 // Runs the research steps on one job description and prints what they found:
 // requirement extraction, the company crawl and the public-discussion search.
 // Usage: npm run research -- examples/posthog-product-engineer.txt https://posthog.com
+import './load-env.js';
 import { readFileSync } from 'node:fs';
 import {
   crawlCompany,

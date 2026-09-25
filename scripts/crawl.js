@@ -1,5 +1,6 @@
 // Crawls one or more company sites and prints what was found.
 // Usage: npm run crawl -- https://posthog.com https://about.gitlab.com
+import './load-env.js';
 import { createCrawlerDeps, crawlCompany } from '@interviewforge/core';
 
 const urls = process.argv.slice(2);

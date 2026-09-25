@@ -5,3 +5,11 @@ export { LLMError } from './llm/errors.js';
 export * from './retrieval/index.js';
 export { extractRequirements } from './extraction/requirements.js';
 export { buildSchedule } from './scheduling/schedule.js';
+export { findCoverageGaps } from './coverage/coverage.js';
+export { kitSchema, validateKit } from './validation/kit-schema.js';
+export {
+  PipelineError,
+  planCategories,
+  runPipeline,
+  validatePipelineInput,
+} from './pipeline/run-pipeline.js';

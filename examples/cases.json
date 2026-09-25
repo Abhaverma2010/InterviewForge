@@ -1,0 +1,20 @@
+[
+  {
+    "id": "posthog-product-engineer",
+    "jd": "Product Engineer — PostHog\nLocation: Remote (US/EU time zones)\n\nWhat you'll do\n- Own features end to end, from talking to users to shipping code\n- Work across our React frontend and Python/Django backend\n- Help debug customer issues in production\n\nRequirements\n- 3+ years of professional software engineering experience\n- Strong experience with React and TypeScript\n- Experience with Python (Django preferred)\n- Comfortable working with SQL and large datasets\n- Clear written communication; we are a remote, async company\n\nNice to have\n- Experience with ClickHouse\n- You've built or run a startup before\n",
+    "company_url": "https://posthog.com",
+    "days": 5
+  },
+  {
+    "id": "stub-gitlab",
+    "jd": "Frontend developer needed.\nReact.\n",
+    "company_url": "https://about.gitlab.com",
+    "days": 1
+  },
+  {
+    "id": "unreachable-company",
+    "jd": "Backend Engineer\n\nRequirements\n- 3+ years with Node.js\n- Experience with PostgreSQL\n- Good communication skills",
+    "company_url": "https://this-company-does-not-exist-9x7.com",
+    "days": 14
+  }
+]
