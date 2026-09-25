@@ -7,7 +7,7 @@ import { createLLMClient, createLLMClientFromEnv, parseAndValidate } from '../sr
 function scriptedFetch(responses) {
   const calls = [];
   const fetchImpl = async (url, init) => {
-    calls.push({ url, body: JSON.parse(init.body) });
+    calls.push({ url, body: init.body ? JSON.parse(init.body) : null });
     const next = responses.shift();
     if (!next) throw new Error('fake fetch: no more scripted responses');
     if (next instanceof Error) throw next;
@@ -241,4 +241,24 @@ test('createLLMClientFromEnv reads the fallback settings', () => {
     LLM_FALLBACK_MODEL: 'backup',
   });
   assert.deepEqual(client.models, ['primary', 'backup']);
+});
+
+test('checkModels reports configured models the key cannot use', async () => {
+  const listing = () =>
+    new Response(
+      JSON.stringify({ data: [{ id: 'models/test-model' }, { id: 'models/gemini-x-flash' }] }),
+      {
+        status: 200,
+      },
+    );
+  const { client } = makeClient([listing(), listing()], { fallbacks: [{ model: 'typo-model' }] });
+  const result = await client.checkModels();
+  assert.deepEqual(
+    result.map((r) => [r.model, r.status]),
+    [
+      ['test-model', 'ok'],
+      ['typo-model', 'missing'],
+    ],
+  );
+  assert.ok(result[1].suggestions.includes('gemini-x-flash'));
 });

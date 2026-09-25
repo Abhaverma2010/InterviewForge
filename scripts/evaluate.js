@@ -56,7 +56,18 @@ try {
   process.exit(1);
 }
 
-console.log(`Models: ${llm.models.join(' → fallback ')}. Running ${cases.length} case(s).\n`);
+console.log(`Models: ${llm.models.join(' → fallback ')}. Running ${cases.length} case(s).`);
+// Catch a mistyped model name now, not as a failure in every case.
+const missing = (await llm.checkModels()).filter((m) => m.status === 'missing');
+for (const m of missing) {
+  console.error(`\nModel "${m.model}" is not available to this API key.`);
+  if (m.suggestions.length) console.error(`Available models include: ${m.suggestions.join(', ')}`);
+}
+if (missing.length) {
+  console.error('\nFix LLM_MODEL / LLM_FALLBACK_MODEL in .env (npm run models lists them all).');
+  process.exit(1);
+}
+console.log('');
 const started = Date.now();
 const results = new Array(cases.length);
 let next = 0;

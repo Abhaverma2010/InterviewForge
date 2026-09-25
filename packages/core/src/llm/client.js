@@ -238,7 +238,37 @@ export function createLLMClient({
     );
   }
 
-  return { chatJson, model, models: endpoints.map((e) => e.model) };
+  /**
+   * Asks each endpoint's /models listing whether its model exists, so a typo in
+   * LLM_MODEL or LLM_FALLBACK_MODEL is caught before any real work starts.
+   * Never throws: an endpoint whose listing can't be fetched is reported as unknown.
+   * @returns {Promise<Array<{ model: string, status: 'ok' | 'missing' | 'unknown', suggestions: string[] }>>}
+   */
+  async function checkModels() {
+    return Promise.all(
+      endpoints.map(async ({ baseUrl: url, apiKey: key, model: name }) => {
+        try {
+          const res = await fetchImpl(`${url}/models`, {
+            headers: { Authorization: `Bearer ${key}` },
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!res.ok) return { model: name, status: 'unknown', suggestions: [] };
+          const { data = [] } = await res.json();
+          const ids = data.map((m) => String(m.id).replace(/^models\//, ''));
+          if (ids.includes(name)) return { model: name, status: 'ok', suggestions: [] };
+          const family = name.split('-').slice(0, 2).join('-'); // "gemini-3.6"
+          const suggestions = ids
+            .filter((id) => id.startsWith(family) || /flash/.test(id))
+            .slice(0, 8);
+          return { model: name, status: 'missing', suggestions };
+        } catch {
+          return { model: name, status: 'unknown', suggestions: [] };
+        }
+      }),
+    );
+  }
+
+  return { chatJson, checkModels, model, models: endpoints.map((e) => e.model) };
 }
 
 export function createLLMClientFromEnv(env = process.env, overrides = {}) {
