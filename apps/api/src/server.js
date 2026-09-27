@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import MongoStore from 'connect-mongo';
 import { createCrawlerDeps, createLLMClientFromEnv } from '@interviewforge/core';
 import { createApp } from './app.js';
+import { seedDemo } from './demo/seed.js';
 import { loadConfig } from './config.js';
 import { createGenerationQueue } from './services/generation-queue.js';
 import { createMemoryStore } from './store/memory.js';
@@ -28,6 +29,13 @@ if (config.mongoUri) {
 } else {
   store = createMemoryStore();
   console.warn('MONGODB_URI is not set: using an in-memory store. Data is lost on restart.');
+}
+
+// SEED_DEMO=true creates the demo account on startup (handy without MongoDB,
+// where the in-memory store starts empty on every run).
+if (process.env.SEED_DEMO === 'true') {
+  const { email, password } = await seedDemo(store, { log: () => {} });
+  console.log(`Demo account ready: ${email} / ${password}`);
 }
 
 const queue = createGenerationQueue({

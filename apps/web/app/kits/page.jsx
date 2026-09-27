@@ -114,7 +114,7 @@ export default function KitsPage() {
               {kit.status === 'failed' && <p className="mt-2 text-xs text-red-700">{kit.error?.message}</p>}
               <div className="mt-3 flex gap-2">
                 <ButtonLink href={`/kits/${kit.id}`} variant="secondary" size="sm">
-                  {kit.status === 'ready' ? 'Open' : 'View progress'}
+                  {{ ready: 'Open', failed: 'See what went wrong' }[kit.status] ?? 'View progress'}
                 </ButtonLink>
                 {kit.status === 'ready' && (
                   <ButtonLink href={`/kits/${kit.id}/practice`} variant="ghost" size="sm">
