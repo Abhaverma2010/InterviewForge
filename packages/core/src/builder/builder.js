@@ -19,6 +19,7 @@ import { buildCompanyBrief } from '../generation/company-research.js';
 import { CATEGORY_FOR_KIND, generateQuestions } from '../generation/questions.js';
 import { guessCompanyName } from '../retrieval/company-name.js';
 import { crawlCompany } from '../retrieval/crawler.js';
+import { isoDate, replanSchedule } from '../scheduling/adaptive.js';
 import { buildSchedule } from '../scheduling/schedule.js';
 import { QUESTION_CATEGORIES, validateKit } from '../validation/kit-schema.js';
 
@@ -33,6 +34,7 @@ export class BuilderError extends Error {
 
 const QUESTION_FIELDS = ['prompt', 'answer_outline', 'difficulty', 'category', 'requirement_ids'];
 const FLASHCARD_FIELDS = ['front', 'back', 'requirement_ids'];
+const STORY_FIELDS = ['title', 'situation', 'action', 'result', 'requirement_ids', 'question_ids'];
 const BRIEF_FIELDS = ['summary', 'what_they_do'];
 
 /** A generated item the user has not touched: safe to replace. */
@@ -52,14 +54,17 @@ export function isReplaceable(item) {
  * @param {object} changes
  * @param {object[]} [changes.questions]  the full, reordered question list
  * @param {object[]} [changes.flashcards]  the full flashcard list
+ * @param {object[]} [changes.stories]  the full story bank (see stories/story-bank.js)
  * @param {{ summary?: string, what_they_do?: string, pinned?: boolean }} [changes.company_brief]
  */
 export function applyEdits(kit, changes) {
   const next = structuredClone(kit);
   const requirementIds = new Set(kit.role.requirements.map((r) => r.id));
 
+  let questionRenames = new Map();
   if (changes.questions) {
-    next.questions = mergeItems(kit.questions, changes.questions, {
+    let renames;
+    ({ items: next.questions, renames } = mergeItems(kit.questions, changes.questions, {
       prefix: 'q',
       fields: QUESTION_FIELDS,
       normalise: (q) => ({
@@ -69,7 +74,8 @@ export function applyEdits(kit, changes) {
         answer_outline: String(q.answer_outline ?? '').trim(),
         difficulty: q.difficulty,
       }),
-    });
+    }));
+    questionRenames = renames;
     const ids = new Set(next.questions.map((q) => q.id));
     for (const day of next.schedule.days) {
       day.question_ids = day.question_ids.filter((id) => ids.has(id));
@@ -85,7 +91,23 @@ export function applyEdits(kit, changes) {
         back: String(f.back ?? '').trim(),
         requirement_ids: (f.requirement_ids ?? []).filter((id) => requirementIds.has(id)),
       }),
-    });
+    }).items;
+  }
+
+  if (changes.stories) {
+    // A story may link to a question created in the same save: follow its new id.
+    next.stories = mergeItems(kit.stories ?? [], changes.stories, {
+      prefix: 's',
+      fields: STORY_FIELDS,
+      normalise: (st) => ({
+        title: String(st.title ?? '').trim(),
+        situation: String(st.situation ?? '').trim(),
+        action: String(st.action ?? '').trim(),
+        result: String(st.result ?? '').trim(),
+        requirement_ids: (st.requirement_ids ?? []).filter((id) => requirementIds.has(id)),
+        question_ids: (st.question_ids ?? []).map((id) => questionRenames.get(id) ?? id),
+      }),
+    }).items;
   }
 
   if (changes.company_brief) {
@@ -109,8 +131,9 @@ function mergeItems(stored, sent, { prefix, fields, normalise }) {
   const byId = new Map(stored.map((item) => [item.id, item]));
   let nextNumber = Math.max(0, ...stored.map((item) => idNumber(item.id))) + 1;
   const used = new Set();
+  const renames = new Map();
 
-  return sent.map((raw) => {
+  const items = sent.map((raw) => {
     const content = normalise(raw);
     const previous = byId.get(raw.id);
     if (previous && !used.has(previous.id)) {
@@ -124,14 +147,17 @@ function mergeItems(stored, sent, { prefix, fields, normalise }) {
       };
     }
     // Unknown (or duplicated) id: a new item the user wrote.
+    const id = `${prefix}${nextNumber++}`;
+    if (raw.id !== undefined) renames.set(raw.id, id);
     return {
-      id: `${prefix}${nextNumber++}`,
+      id,
       ...content,
       origin: 'user',
       edited: false,
       pinned: Boolean(raw.pinned),
     };
   });
+  return { items, renames };
 }
 
 // ─── Regeneration ────────────────────────────────────────────────────────────
@@ -224,15 +250,27 @@ export function mergeCategory(kit, category, fresh) {
 
 /**
  * Rebuilds the schedule from the kit's current questions, optionally over a
- * new number of days (the user's interview date moved).
+ * new number of days (the user's interview date moved). It starts today.
  */
-export function regenerateSchedule(kit, { days = kit.schedule.days_available } = {}) {
+export function regenerateSchedule(
+  kit,
+  { days = kit.schedule.days_available, today = new Date() } = {},
+) {
   const next = structuredClone(kit);
-  next.schedule = buildSchedule({
-    requirements: kit.role.requirements,
-    questions: kit.questions,
-    days,
-  });
+  next.schedule = {
+    ...buildSchedule({ requirements: kit.role.requirements, questions: kit.questions, days }),
+    start_date: isoDate(today),
+  };
+  return finish(next);
+}
+
+/**
+ * Adaptive re-plan: the days actually left (or `days`), starting today,
+ * weakest must-have requirements first, based on practice results.
+ */
+export function replanFromToday(kit, cards, { days, today = new Date() } = {}) {
+  const next = structuredClone(kit);
+  next.schedule = replanSchedule(kit, cards, { days, today });
   return finish(next);
 }
 
@@ -279,7 +317,15 @@ export function applyBrief(kit, brief) {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // Coverage is recomputed after every change, so the kit always tells the truth.
+// Story links to questions that no longer exist (deleted, or replaced by a
+// regeneration) are dropped.
 function finish(kit) {
+  if (kit.stories) {
+    const questionIds = new Set(kit.questions.map((q) => q.id));
+    for (const story of kit.stories) {
+      story.question_ids = story.question_ids.filter((id) => questionIds.has(id));
+    }
+  }
   kit.coverage = {
     ...kit.coverage,
     uncovered_requirement_ids: findCoverageGaps(kit.role.requirements, kit.questions).uncovered,

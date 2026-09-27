@@ -26,5 +26,8 @@ export {
   regenerateBrief,
   regenerateCategory,
   regenerateSchedule,
+  replanFromToday,
 } from './builder/builder.js';
+export { currentDay, daysLeft, readiness, replanSchedule } from './scheduling/adaptive.js';
+export { analyseStoryBank, isStoryQuestion, OVERUSE_THRESHOLD } from './stories/story-bank.js';
 export { nextSessionOrder, practiceSummary, rateCard, RATINGS } from './practice/leitner.js';

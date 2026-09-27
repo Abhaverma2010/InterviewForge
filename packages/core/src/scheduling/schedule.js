@@ -36,13 +36,23 @@ export function questionCost(question) {
  * @param {Array<{ id: string, requirement_ids: string[], difficulty: number }>} questions
  * @param {Map<string, { priority: 'must' | 'nice' }>} requirementsById
  */
-export function sortForSchedule(questions, requirementsById) {
+export function sortForSchedule(questions, requirementsById, weakness = null) {
   return [...questions].sort((a, b) => {
     // true - false === 1, so a must-have `b` sorts ahead of a nice-to-have `a`.
     const byPriority = isMustHave(b, requirementsById) - isMustHave(a, requirementsById);
     if (byPriority !== 0) return byPriority;
+    // Adaptive plans: what the user is weakest on comes first.
+    if (weakness) {
+      const byWeakness = questionWeakness(b, weakness) - questionWeakness(a, weakness);
+      if (byWeakness !== 0) return byWeakness;
+    }
     return b.difficulty - a.difficulty;
   });
+}
+
+// A question is as weak as the weakest requirement it covers (1 = weakest).
+function questionWeakness(question, weakness) {
+  return Math.max(0, ...question.requirement_ids.map((id) => weakness.get(id) ?? 0));
 }
 
 /**
@@ -78,15 +88,16 @@ export function splitIntoDays(items, dayCount) {
  * @param {Array<{ id: string, priority: 'must' | 'nice' }>} input.requirements
  * @param {Array<{ id: string, requirement_ids: string[], category: string, difficulty: number }>} input.questions
  * @param {number} input.days  number of days before the interview
+ * @param {Map<string, number>} [input.weakness]  requirement id → 0 (solid) to 1 (weakest), for adaptive plans
  * @returns {{ days_available: number, days: Array<{ day: number, focus: string, question_ids: string[], minutes: number }> }}
  */
-export function buildSchedule({ requirements, questions, days }) {
+export function buildSchedule({ requirements, questions, days, weakness = null }) {
   if (!Number.isInteger(days) || days < 1) {
     throw new RangeError(`days must be a positive integer, got ${days}`);
   }
 
   const requirementsById = new Map(requirements.map((r) => [r.id, r]));
-  const ordered = sortForSchedule(questions, requirementsById);
+  const ordered = sortForSchedule(questions, requirementsById, weakness);
 
   // With 3+ days the last one is kept for review, so the night before the
   // interview is revision rather than new material.

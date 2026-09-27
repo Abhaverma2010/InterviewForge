@@ -366,7 +366,10 @@ function assembleKit({
     },
     questions: kitQuestions,
     flashcards: kitFlashcards,
-    schedule: buildSchedule({ requirements: role.requirements, questions: kitQuestions, days }),
+    schedule: {
+      ...buildSchedule({ requirements: role.requirements, questions: kitQuestions, days }),
+      start_date: researchedAt.slice(0, 10),
+    },
     coverage,
     meta: { warnings, steps },
   };

@@ -104,6 +104,18 @@ export const kitSchema = z
   })
   .passthrough();
 
+const storySchema = z
+  .object({
+    id: id('s'),
+    title: z.string().min(1),
+    situation: z.string(),
+    action: z.string(),
+    result: z.string(),
+    requirement_ids: z.array(id('r')),
+    question_ids: z.array(id('q')),
+  })
+  .passthrough();
+
 /**
  * Checks a kit's shape and its internal consistency.
  * @returns {{ ok: true } | { ok: false, errors: string[] }}
@@ -146,6 +158,26 @@ export function validateKit(kit) {
 
   for (const rid of kit.coverage.uncovered_requirement_ids) {
     if (!requirementIds.has(rid)) errors.push(`coverage lists unknown ${rid}`);
+  }
+
+  // Extension: the story bank. Optional, but consistent when present.
+  if (kit.stories !== undefined) {
+    const parsedStories = z.array(storySchema).safeParse(kit.stories);
+    if (!parsedStories.success) {
+      errors.push(
+        ...parsedStories.error.issues.map((i) => `stories.${i.path.join('.')}: ${i.message}`),
+      );
+    } else {
+      checkUnique(kit.stories, 'story', errors);
+      for (const st of kit.stories) {
+        for (const rid of st.requirement_ids) {
+          if (!requirementIds.has(rid)) errors.push(`story ${st.id} references unknown ${rid}`);
+        }
+        for (const qid of st.question_ids) {
+          if (!questionIds.has(qid)) errors.push(`story ${st.id} references unknown ${qid}`);
+        }
+      }
+    }
   }
 
   return errors.length ? { ok: false, errors } : { ok: true };
