@@ -13,3 +13,12 @@ export {
   runPipeline,
   validatePipelineInput,
 } from './pipeline/run-pipeline.js';
+export {
+  applyEdits,
+  BuilderError,
+  isReplaceable,
+  regenerateBrief,
+  regenerateCategory,
+  regenerateSchedule,
+} from './builder/builder.js';
+export { nextSessionOrder, practiceSummary, rateCard, RATINGS } from './practice/leitner.js';
