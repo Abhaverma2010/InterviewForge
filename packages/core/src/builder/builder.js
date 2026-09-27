@@ -139,8 +139,8 @@ function mergeItems(stored, sent, { prefix, fields, normalise }) {
 /**
  * Regenerates one question category. Replaceable questions in that category
  * are dropped and fresh ones generated; the user's questions (written, edited
- * or pinned) stay where they are. Must-have requirements of the category that
- * end up uncovered get one gap-filling pass.
+ * or pinned) stay where they are. Requirements of the category that end up
+ * uncovered get one gap-filling pass.
  */
 export async function regenerateCategory(kit, category, { llm }) {
   const fresh = await generateCategoryQuestions(kit, category, { llm });
@@ -170,9 +170,9 @@ export async function generateCategoryQuestions(kit, category, { llm }) {
 
   let fresh = await generateQuestions({ category, requirements, count, context }, { llm });
 
-  // Keep the promise that no must-have ships uncovered.
-  const gaps = findCoverageGaps(kit.role.requirements, [...kept, ...fresh]).uncoveredMust.filter(
-    (id) => requirements.some((r) => r.id === id),
+  // Leave no requirement of this category uncovered, as the first generation did.
+  const gaps = findCoverageGaps(kit.role.requirements, [...kept, ...fresh]).uncovered.filter((id) =>
+    requirements.some((r) => r.id === id),
   );
   if (gaps.length) {
     const missing = requirements.filter((r) => gaps.includes(r.id));
@@ -203,12 +203,16 @@ export function mergeCategory(kit, category, fresh) {
     pinned: false,
   }));
 
-  // New questions go where the category's old ones were, so the list keeps its shape.
+  // The user's questions keep their place at the top of the category; the new
+  // ones follow them, so regenerating never reshuffles what the user curated.
+  const lastKept = kept.findLastIndex((q) => q.category === category);
   const firstIndex = kit.questions.findIndex((q) => q.category === category);
   const insertAt =
-    firstIndex === -1
-      ? kept.length
-      : kept.filter((q) => kit.questions.indexOf(q) < firstIndex).length;
+    lastKept !== -1
+      ? lastKept + 1
+      : firstIndex === -1
+        ? kept.length
+        : kept.filter((q) => kit.questions.indexOf(q) < firstIndex).length;
   next.questions = [...kept.slice(0, insertAt), ...freshItems, ...kept.slice(insertAt)];
 
   const ids = new Set(next.questions.map((q) => q.id));

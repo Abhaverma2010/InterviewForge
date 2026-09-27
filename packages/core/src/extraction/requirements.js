@@ -141,7 +141,10 @@ export function verifyExtraction(raw, jd) {
     .filter((r) => r && findAnchor(r, normalisedLines, 0.6));
 
   const jdChars = jd.trim().length;
-  const thin = jdChars < 250 || requirements.length < 3;
+  // Thin: too few requirements to build a real kit from, or a very short
+  // posting that also states little. (A compact posting listing five clear
+  // requirements is not thin.)
+  const thin = requirements.length < 3 || (jdChars < 200 && requirements.length < 5);
   const notes = [];
   if (thin) {
     notes.push(

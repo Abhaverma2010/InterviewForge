@@ -214,6 +214,28 @@ describe('regenerateCategory', () => {
     assert.deepEqual(validateKit(next), { ok: true });
   });
 
+  test('keeps the user’s questions at the top of the category, new ones after', async () => {
+    const questions = structuredClone(kit.questions);
+    questions[0].prompt = 'Edited by me?';
+    const edited = applyEdits(kit, { questions });
+    const next = await regenerateCategory(edited, 'technical', { llm: createFakeLlm() });
+    const technical = next.questions.filter((q) => q.category === 'technical');
+    assert.equal(technical[0].prompt, 'Edited by me?');
+    assert.ok(technical.slice(1).every((q) => q.origin === 'generated' && !q.edited));
+  });
+
+  test('covers nice-to-have requirements too', async () => {
+    const withNice = structuredClone(kit);
+    withNice.role.requirements.push({
+      id: 'r4',
+      text: 'Kubernetes',
+      kind: 'technical',
+      priority: 'nice',
+    });
+    const next = await regenerateCategory(withNice, 'technical', { llm: createFakeLlm() });
+    assert.ok(next.questions.some((q) => q.requirement_ids.includes('r4')));
+  });
+
   test('does not leave a must-have uncovered', async () => {
     // The fake's first technical draft cites only the first requirement.
     const next = await regenerateCategory(kit, 'technical', { llm: createFakeLlm() });

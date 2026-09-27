@@ -151,6 +151,25 @@ describe('a two-line stub posting', () => {
   });
 });
 
+describe('thin postings', () => {
+  const reqs = (n) => Array.from({ length: n }, (_, i) => req(`Skill ${i}`, `Skill ${i}`));
+  const jdWith = (n) =>
+    `Engineer\n${Array.from({ length: n }, (_, i) => `- Skill ${i}`).join('\n')}`;
+
+  test('a short posting listing five clear requirements is not thin', () => {
+    const raw = extractionSchema.parse({ requirements: reqs(5) });
+    assert.equal(verifyExtraction(raw, jdWith(5)).thin, false);
+  });
+
+  test('fewer than three requirements is thin, however long the posting', () => {
+    const raw = extractionSchema.parse({ requirements: reqs(2) });
+    assert.equal(
+      verifyExtraction(raw, `${jdWith(2)}\n${'We are a great team. '.repeat(40)}`).thin,
+      true,
+    );
+  });
+});
+
 describe('extractRequirements', () => {
   test('wraps the posting as data and neutralises a smuggled closing tag', async () => {
     const llm = fakeLlm({});
