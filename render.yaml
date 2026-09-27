@@ -1,0 +1,37 @@
+# Render Blueprint for the API (https://render.com/docs/blueprint-spec).
+# New → Blueprint → pick this repository. Values marked sync: false are
+# asked for in the dashboard and never stored in the repository.
+services:
+  - type: web
+    name: interviewforge-api
+    runtime: node
+    plan: free
+    # Only the API and the shared core are installed; the web app deploys to Vercel.
+    buildCommand: npm ci --workspace @interviewforge/api --workspace @interviewforge/core --include-workspace-root
+    startCommand: npm start --workspace @interviewforge/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: gemini-3.6-flash
+      - key: LLM_FALLBACK_MODEL
+        value: gemini-3.5-flash-lite
+      - key: LLM_REQUESTS_PER_MINUTE
+        value: '8'
+      - key: WEB_ORIGIN
+        sync: false
+      - key: ALLOW_PRIVATE_URLS
+        value: 'false'
+      - key: GENERATION_CONCURRENCY
+        value: '1'
