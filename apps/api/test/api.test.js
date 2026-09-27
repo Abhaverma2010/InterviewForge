@@ -367,6 +367,66 @@ describe('editing', () => {
   });
 });
 
+describe('story bank and adaptive plan', () => {
+  test('saves stories and returns story coverage with the kit', async () => {
+    const call = await signedIn();
+    const kit = await readyKit(call);
+    const behavioural = kit.kit.questions.find((q) => q.category === 'behavioural');
+    const res = await call('PATCH', `/api/kits/${kit.id}`, {
+      version: 1,
+      stories: [
+        {
+          id: 'tmp-s-1',
+          title: 'Explaining the migration',
+          situation: 's',
+          action: 'a',
+          result: 'r',
+          requirement_ids: behavioural.requirement_ids,
+          question_ids: [],
+        },
+      ],
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.kit.kit.stories[0].id, 's1');
+    const entry = res.body.kit.insights.stories.questions.find(
+      (q) => q.question_id === behavioural.id,
+    );
+    assert.deepEqual(entry.story_ids, ['s1']);
+  });
+
+  test('a story needs a title', async () => {
+    const call = await signedIn();
+    const kit = await readyKit(call);
+    const res = await call('PATCH', `/api/kits/${kit.id}`, {
+      version: 1,
+      stories: [{ id: 'x', title: ' ', requirement_ids: [], question_ids: [] }],
+    });
+    assert.equal(res.status, 400);
+  });
+
+  test('adaptive re-plan uses practice results and starts today', async () => {
+    const call = await signedIn();
+    const kit = await readyKit(call);
+    assert.equal(kit.insights.current_day, 1);
+    assert.equal(kit.insights.readiness.score, 0);
+    await call('POST', `/api/kits/${kit.id}/practice`, {
+      card_id: kit.kit.flashcards[0].id,
+      rating: 'easy',
+    });
+    const res = await call('POST', `/api/kits/${kit.id}/regenerate`, {
+      section: 'schedule',
+      adaptive: true,
+      days: 2,
+    });
+    assert.equal(res.status, 200);
+    const schedule = res.body.kit.kit.schedule;
+    assert.equal(schedule.days.length, 2);
+    assert.equal(schedule.start_date, new Date().toISOString().slice(0, 10));
+    assert.ok(schedule.adaptive.readiness_score > 0);
+    assert.ok(res.body.kit.insights.readiness.score > 0);
+  });
+});
+
 describe('practice', () => {
   test('records ratings and orders the next session by confidence', async () => {
     const call = await signedIn();

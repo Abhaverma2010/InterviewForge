@@ -32,6 +32,11 @@ import {
   RATINGS,
   rateCard,
   regenerateSchedule,
+  analyseStoryBank,
+  currentDay,
+  daysLeft,
+  readiness,
+  replanFromToday,
 } from '@interviewforge/core';
 import { ApiError, handle, rateLimit, validateBody } from '../http.js';
 import { requireAuth } from './auth.js';
@@ -72,10 +77,20 @@ const flashcardItem = z.object({
   requirement_ids: z.array(z.string().max(16)).max(50).default([]),
   pinned: z.boolean().optional(),
 });
+const storyItem = z.object({
+  id: z.string().max(64),
+  title: z.string().trim().min(1, 'A story needs a title.').max(200),
+  situation: z.string().max(4000).default(''),
+  action: z.string().max(4000).default(''),
+  result: z.string().max(4000).default(''),
+  requirement_ids: z.array(z.string().max(16)).max(50).default([]),
+  question_ids: z.array(z.string().max(64)).max(300).default([]),
+});
 const editBody = z.object({
   version: z.number().int().min(1),
   questions: z.array(questionItem).max(300).optional(),
   flashcards: z.array(flashcardItem).max(300).optional(),
+  stories: z.array(storyItem).max(50).optional(),
   company_brief: z
     .object({
       summary: z.string().max(5000).optional(),
@@ -90,6 +105,8 @@ const regenerateBody = z.discriminatedUnion('section', [
   z.object({
     section: z.literal('schedule'),
     days: z.number().int().min(1).max(MAX_DAYS).optional(),
+    // Adaptive: plan the days left from today, weakest must-haves first.
+    adaptive: z.boolean().optional(),
   }),
 ]);
 
@@ -248,7 +265,10 @@ export function kitRoutes({ store, queue, llm, crawler }) {
       try {
         // The slow, model-backed part runs on the kit as it was at the start...
         let merge;
-        if (section === 'schedule') {
+        if (section === 'schedule' && req.body.adaptive) {
+          const cards = record.practice?.cards ?? {};
+          merge = (kit) => replanFromToday(kit, cards, { days: req.body.days });
+        } else if (section === 'schedule') {
           merge = (kit) => regenerateSchedule(kit, { days: req.body.days });
         } else if (section === 'questions') {
           const fresh = await generateCategoryQuestions(record.kit, req.body.category, { llm });
@@ -375,7 +395,19 @@ function summary(record) {
 
 function full(record) {
   const { input_hash, owner, ...rest } = record;
-  return rest;
+  return record.kit ? { ...rest, insights: insightsFor(record) } : rest;
+}
+
+// Derived views the interface shows next to the kit, computed here so the
+// logic lives in one place (core) and is never re-implemented in the browser.
+function insightsFor(record) {
+  const today = new Date();
+  return {
+    stories: analyseStoryBank(record.kit),
+    readiness: readiness(record.kit, record.practice?.cards ?? {}),
+    current_day: currentDay(record.kit, today),
+    days_left: daysLeft(record.kit, today),
+  };
 }
 
 function conflict(record) {

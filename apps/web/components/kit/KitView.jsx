@@ -11,12 +11,14 @@ import { FlashcardsEditor } from './FlashcardsEditor';
 import { Overview } from './Overview';
 import { QuestionsEditor } from './QuestionsEditor';
 import { SaveStatus } from './SaveStatus';
+import { StoryBank } from './StoryBank';
 import { ScheduleView } from './ScheduleView';
 
 const TABS = [
   ['overview', 'Overview'],
   ['questions', 'Questions'],
   ['flashcards', 'Flashcards'],
+  ['stories', 'Story bank'],
   ['schedule', 'Schedule'],
 ];
 
@@ -90,6 +92,7 @@ export function KitView({ initialRecord }) {
         {tab === 'overview' && <Overview editor={editor} />}
         {tab === 'questions' && <QuestionsEditor editor={editor} />}
         {tab === 'flashcards' && <FlashcardsEditor editor={editor} />}
+        {tab === 'stories' && <StoryBank editor={editor} />}
         {tab === 'schedule' && <ScheduleView editor={editor} />}
       </div>
     </div>

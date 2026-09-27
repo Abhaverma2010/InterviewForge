@@ -12,6 +12,7 @@
 
 const QUESTION_FIELDS = ['category', 'prompt', 'answer_outline', 'difficulty', 'requirement_ids', 'pinned'];
 const FLASHCARD_FIELDS = ['front', 'back', 'requirement_ids', 'pinned'];
+const STORY_FIELDS = ['title', 'situation', 'action', 'result', 'requirement_ids', 'question_ids'];
 const BRIEF_FIELDS = ['summary', 'what_they_do', 'pinned'];
 
 /** The parts of a kit the builder edits. */
@@ -19,6 +20,7 @@ export function sectionsOf(kit) {
   return {
     questions: kit.questions,
     flashcards: kit.flashcards,
+    stories: kit.stories ?? [],
     company_brief: {
       summary: kit.company_brief.summary,
       what_they_do: kit.company_brief.what_they_do,
@@ -34,6 +36,7 @@ export function toPatch(sections, version) {
     version,
     questions: sections.questions.map((q) => pick(q, QUESTION_FIELDS)),
     flashcards: sections.flashcards.map((f) => pick(f, FLASHCARD_FIELDS)),
+    stories: sections.stories.map((st) => pick(st, STORY_FIELDS)),
     company_brief: sections.company_brief,
   };
 }
@@ -42,6 +45,7 @@ export function isDirty(local, base) {
   return (
     listsDiffer(local.questions, base.questions, QUESTION_FIELDS) ||
     listsDiffer(local.flashcards, base.flashcards, FLASHCARD_FIELDS) ||
+    listsDiffer(local.stories, base.stories, STORY_FIELDS) ||
     BRIEF_FIELDS.some((f) => !same(local.company_brief[f], base.company_brief[f]))
   );
 }
@@ -59,14 +63,24 @@ export const isTempId = (id) => String(id).startsWith('tmp-');
  */
 export function adoptServerIds(local, sent, server) {
   const renames = new Map();
-  for (const key of ['questions', 'flashcards']) {
+  for (const key of ['questions', 'flashcards', 'stories']) {
     sent[key].forEach((item, i) => {
       if (isTempId(item.id) && server[key][i]) renames.set(item.id, server[key][i].id);
     });
   }
   if (!renames.size) return local;
   const rename = (item) => (renames.has(item.id) ? { ...item, id: renames.get(item.id) } : item);
-  return { ...local, questions: local.questions.map(rename), flashcards: local.flashcards.map(rename) };
+  // Stories may point at questions that just got their real ids.
+  const renameLinks = (story) => ({
+    ...rename(story),
+    question_ids: story.question_ids.map((id) => renames.get(id) ?? id),
+  });
+  return {
+    ...local,
+    questions: local.questions.map(rename),
+    flashcards: local.flashcards.map(rename),
+    stories: local.stories.map(renameLinks),
+  };
 }
 
 /**
@@ -83,6 +97,7 @@ export function rebase(server, local, base) {
   return {
     questions: rebaseList(server.questions, local.questions, base.questions, QUESTION_FIELDS),
     flashcards: rebaseList(server.flashcards, local.flashcards, base.flashcards, FLASHCARD_FIELDS),
+    stories: rebaseList(server.stories, local.stories, base.stories, STORY_FIELDS),
     company_brief: Object.fromEntries(
       BRIEF_FIELDS.map((f) => [
         f,

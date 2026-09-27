@@ -298,6 +298,25 @@ function paymentsKit() {
       { pass: 1, uncovered_requirement_ids: ['r6', 'r8'] },
       { pass: 2, uncovered_requirement_ids: [] },
     ],
+    stories: [
+      {
+        title: 'Rewriting the reconciliation job',
+        situation: 'Nightly reconciliation missed about 0.3% of payouts and nobody trusted it.',
+        action:
+          'Wrote a two-page design doc comparing three fixes, ran a review with finance, then shipped an idempotent rewrite behind a flag.',
+        result:
+          'Mismatches dropped to zero for six months; the doc became the template for the team.',
+        requirement_ids: ['r5'],
+      },
+      {
+        title: 'Coaching Priya to lead a migration',
+        situation: 'A mid-level engineer wanted to lead but had never run a project.',
+        action:
+          'Paired on the plan, reviewed her design doc twice, then stepped back and only joined the weekly check-in.',
+        result: 'She led the Kafka migration end to end and was promoted the next cycle.',
+        requirement_ids: ['r6'],
+      },
+    ],
     practice: {
       f1: progress(4, 'good', '2026-09-21T09:00:00Z', 3),
       f3: progress(1, 'again', '2026-09-21T09:02:00Z', 2),
@@ -637,6 +656,7 @@ function stubKit() {
 // ─── Assembly ────────────────────────────────────────────────────────────────
 
 function assemble({
+  stories = [],
   jd,
   companyUrl,
   days,
@@ -674,7 +694,19 @@ function assemble({
     },
     questions: kitQuestions,
     flashcards: kitFlashcards,
-    schedule: buildSchedule({ requirements: role.requirements, questions: kitQuestions, days }),
+    stories: stories.map((story, i) => ({
+      id: `s${i + 1}`,
+      question_ids: [],
+      origin: 'user',
+      edited: false,
+      pinned: false,
+      ...story,
+    })),
+    // The demo plan starts today, so "today" always falls on day 1.
+    schedule: {
+      ...buildSchedule({ requirements: role.requirements, questions: kitQuestions, days }),
+      start_date: new Date().toISOString().slice(0, 10),
+    },
     coverage: {
       uncovered_requirement_ids: findCoverageGaps(role.requirements, kitQuestions).uncovered,
       passes: coverageHistory.length,

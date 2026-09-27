@@ -12,9 +12,10 @@ const q = (id, prompt, extra = {}) => ({
   pinned: false,
   ...extra,
 });
-const sections = (questions, flashcards = [], brief = {}) => ({
+const sections = (questions, flashcards = [], brief = {}, stories = []) => ({
   questions,
   flashcards,
+  stories,
   company_brief: { summary: 'S', what_they_do: 'W', pinned: false, ...brief },
 });
 
@@ -95,6 +96,36 @@ describe('adoptServerIds', () => {
         ['q1', 'one'],
         ['q4', 'mine, longer'],
       ],
+    );
+  });
+});
+
+describe('stories', () => {
+  const st = (id, title, question_ids = []) => ({
+    id,
+    title,
+    situation: '',
+    action: '',
+    result: '',
+    requirement_ids: [],
+    question_ids,
+  });
+
+  test('a story linked to a new question follows the question’s real id', () => {
+    const sent = sections([q('tmp-q-a', 'mine')], [], {}, [st('tmp-s-a', 'Outage', ['tmp-q-a'])]);
+    const server = sections([q('q9', 'mine')], [], {}, [st('s1', 'Outage', ['q9'])]);
+    const renamed = adoptServerIds(sent, sent, server);
+    assert.equal(renamed.stories[0].id, 's1');
+    assert.deepEqual(renamed.stories[0].question_ids, ['q9']);
+  });
+
+  test('story edits are rebased like any other item', () => {
+    const base = sections([], [], {}, [st('s1', 'Outage')]);
+    const local = sections([], [], {}, [st('s1', 'The big outage'), st('tmp-s-b', 'New one')]);
+    const server = sections([], [], {}, [st('s1', 'Outage')]);
+    assert.deepEqual(
+      rebase(server, local, base).stories.map((x) => x.title),
+      ['The big outage', 'New one'],
     );
   });
 });

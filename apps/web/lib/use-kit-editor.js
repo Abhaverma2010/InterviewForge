@@ -19,6 +19,7 @@ export function draftProblems(draft) {
   if (draft.flashcards.some((f) => !f.front.trim() || !f.back.trim())) {
     problems.push('A flashcard is missing its front or back.');
   }
+  if (draft.stories.some((st) => !st.title.trim())) problems.push('A story needs a title.');
   return problems;
 }
 
