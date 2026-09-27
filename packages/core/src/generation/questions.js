@@ -101,10 +101,16 @@ export async function generateQuestions(
   return cleanQuestions(result.questions, { category, requirements });
 }
 
+// "Tell me about a time..." is a behavioural question whichever call wrote it.
+const STAR_PHRASING =
+  /^\s*(tell me about|describe|walk me through|give (me )?an example of|share)\b.{0,40}\b(a|one) (time|situation|occasion|moment)\b/i;
+
 /**
  * Keeps only what the model is allowed to say: cited ids must be ones we
  * offered, difficulty is an integer 1-3, duplicates are removed. Technical and
- * system-design questions that cite nothing valid are dropped.
+ * system-design questions that cite nothing valid are dropped. A question
+ * phrased as a past-experience story is filed as behavioural, since that is
+ * how it will be answered.
  */
 export function cleanQuestions(questions, { category, requirements }) {
   const allowed = new Set(requirements.map((r) => r.id));
@@ -120,9 +126,10 @@ export function cleanQuestions(questions, { category, requirements }) {
     if (seen.has(key)) continue;
     seen.add(key);
 
+    const storyQuestion = category === 'technical' && STAR_PHRASING.test(q.prompt);
     cleaned.push({
       requirement_ids: requirementIds,
-      category,
+      category: storyQuestion ? 'behavioural' : category,
       prompt: q.prompt.trim(),
       answer_outline: q.answer_outline.trim(),
       difficulty: Math.min(3, Math.max(1, Math.round(Number(q.difficulty) || 2))),
