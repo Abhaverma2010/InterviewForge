@@ -6,9 +6,16 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch --env-file-if-exists=../../.env src/server.js"
+    "dev": "node --watch src/server.js",
+    "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "bcryptjs": "^3.0.3",
+    "connect-mongo": "^6.0.0",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "mongoose": "^9.10.2",
+    "zod": "^4.6.5",
+    "@interviewforge/core": "*"
   }
 }

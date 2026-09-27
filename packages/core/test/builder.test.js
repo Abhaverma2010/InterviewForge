@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   applyEdits,
   BuilderError,
+  generateCategoryQuestions,
   isReplaceable,
+  mergeCategory,
   regenerateCategory,
   regenerateSchedule,
 } from '../src/builder/builder.js';
@@ -231,7 +233,37 @@ describe('regenerateCategory', () => {
   });
 });
 
+describe('generate then merge (regeneration while the user keeps editing)', () => {
+  test('merging onto a newer kit keeps edits made in the meantime', async () => {
+    const fresh = await generateCategoryQuestions(kit, 'technical', { llm: createFakeLlm() });
+    // Meanwhile the user edits a behavioural question and adds a technical one.
+    const questions = structuredClone(kit.questions);
+    questions[2].prompt = 'Edited while regenerating?';
+    questions.push({
+      id: 'x',
+      category: 'technical',
+      requirement_ids: ['r1'],
+      prompt: 'Added meanwhile?',
+      answer_outline: '',
+      difficulty: 1,
+    });
+    const latest = applyEdits(kit, { questions });
+
+    const merged = mergeCategory(latest, 'technical', fresh);
+    assert.equal(merged.questions.find((q) => q.id === 'q3').prompt, 'Edited while regenerating?');
+    assert.ok(merged.questions.some((q) => q.prompt === 'Added meanwhile?'));
+    assert.ok(!merged.questions.some((q) => q.id === 'q1' || q.id === 'q2'));
+    assert.equal(new Set(merged.questions.map((q) => q.id)).size, merged.questions.length);
+  });
+});
+
 describe('regenerateSchedule', () => {
+  test('can change the number of days', () => {
+    const next = regenerateSchedule(kit, { days: 7 });
+    assert.equal(next.schedule.days_available, 7);
+    assert.equal(next.schedule.days.length, 7);
+  });
+
   test('schedules every current question over the same number of days', () => {
     const withNew = applyEdits(kit, {
       questions: [

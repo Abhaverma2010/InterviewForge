@@ -143,6 +143,15 @@ function mergeItems(stored, sent, { prefix, fields, normalise }) {
  * end up uncovered get one gap-filling pass.
  */
 export async function regenerateCategory(kit, category, { llm }) {
+  const fresh = await generateCategoryQuestions(kit, category, { llm });
+  return mergeCategory(kit, category, fresh);
+}
+
+/**
+ * The slow half of regenerateCategory: asks the model for new questions for
+ * a category, based on `kit`. Returns them without ids.
+ */
+export async function generateCategoryQuestions(kit, category, { llm }) {
   if (!QUESTION_CATEGORIES.includes(category)) {
     throw new BuilderError('INVALID_CATEGORY', `Unknown question category: ${category}`);
   }
@@ -162,9 +171,8 @@ export async function regenerateCategory(kit, category, { llm }) {
   let fresh = await generateQuestions({ category, requirements, count, context }, { llm });
 
   // Keep the promise that no must-have ships uncovered.
-  const covered = [...kept, ...fresh];
-  const gaps = findCoverageGaps(kit.role.requirements, covered).uncoveredMust.filter((id) =>
-    requirements.some((r) => r.id === id),
+  const gaps = findCoverageGaps(kit.role.requirements, [...kept, ...fresh]).uncoveredMust.filter(
+    (id) => requirements.some((r) => r.id === id),
   );
   if (gaps.length) {
     const missing = requirements.filter((r) => gaps.includes(r.id));
@@ -174,7 +182,17 @@ export async function regenerateCategory(kit, category, { llm }) {
     );
     fresh = [...fresh, ...filled];
   }
+  return fresh;
+}
 
+/**
+ * The fast, pure half: puts freshly generated questions into `kit`, replacing
+ * only the category's replaceable questions. Because it is pure it can be
+ * applied to the latest saved kit, so edits made while the model was working
+ * are not lost.
+ */
+export function mergeCategory(kit, category, fresh) {
+  const kept = kit.questions.filter((q) => q.category !== category || !isReplaceable(q));
   const next = structuredClone(kit);
   let nextNumber = Math.max(0, ...kit.questions.map((q) => idNumber(q.id))) + 1;
   const freshItems = fresh.map((q) => ({
@@ -190,22 +208,26 @@ export async function regenerateCategory(kit, category, { llm }) {
   const insertAt =
     firstIndex === -1
       ? kept.length
-      : kept.filter((q, i) => kit.questions.indexOf(q) < firstIndex).length;
+      : kept.filter((q) => kit.questions.indexOf(q) < firstIndex).length;
   next.questions = [...kept.slice(0, insertAt), ...freshItems, ...kept.slice(insertAt)];
 
   const ids = new Set(next.questions.map((q) => q.id));
-  for (const day of next.schedule.days)
+  for (const day of next.schedule.days) {
     day.question_ids = day.question_ids.filter((id) => ids.has(id));
+  }
   return finish(next);
 }
 
-/** Rebuilds the schedule from the kit's current questions. */
-export function regenerateSchedule(kit) {
+/**
+ * Rebuilds the schedule from the kit's current questions, optionally over a
+ * new number of days (the user's interview date moved).
+ */
+export function regenerateSchedule(kit, { days = kit.schedule.days_available } = {}) {
   const next = structuredClone(kit);
   next.schedule = buildSchedule({
     requirements: kit.role.requirements,
     questions: kit.questions,
-    days: kit.schedule.days_available,
+    days,
   });
   return finish(next);
 }
@@ -215,6 +237,11 @@ export function regenerateSchedule(kit) {
  * is pinned. The hiring process and everything else in the kit are kept.
  */
 export async function regenerateBrief(kit, { llm, crawler }) {
+  return applyBrief(kit, await generateBrief(kit, { llm, crawler }));
+}
+
+/** The slow half of regenerateBrief: crawl and write a new brief. */
+export async function generateBrief(kit, { llm, crawler }) {
   if (kit.company_brief.pinned) {
     throw new BuilderError('PINNED', 'The company brief is pinned. Unpin it to regenerate.');
   }
@@ -223,8 +250,14 @@ export async function regenerateBrief(kit, { llm, crawler }) {
   const company =
     kit.source.company ||
     guessCompanyName({ siteName: home?.siteName, title: home?.title, url: kit.source.company_url });
-  const brief = await buildCompanyBrief({ company, crawl }, { llm });
+  return buildCompanyBrief({ company, crawl }, { llm });
+}
 
+/** The pure half: puts a generated brief into the kit. */
+export function applyBrief(kit, brief) {
+  if (kit.company_brief.pinned) {
+    throw new BuilderError('PINNED', 'The company brief is pinned. Unpin it to regenerate.');
+  }
   const next = structuredClone(kit);
   next.company_brief = {
     ...kit.company_brief,

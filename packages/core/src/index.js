@@ -6,17 +6,23 @@ export * from './retrieval/index.js';
 export { extractRequirements } from './extraction/requirements.js';
 export { buildSchedule } from './scheduling/schedule.js';
 export { findCoverageGaps } from './coverage/coverage.js';
-export { kitSchema, validateKit } from './validation/kit-schema.js';
+export { kitSchema, QUESTION_CATEGORIES, validateKit } from './validation/kit-schema.js';
 export {
+  MAX_DAYS,
+  MAX_JD_CHARS,
   PipelineError,
   planCategories,
   runPipeline,
   validatePipelineInput,
 } from './pipeline/run-pipeline.js';
 export {
+  applyBrief,
   applyEdits,
   BuilderError,
+  generateBrief,
+  generateCategoryQuestions,
   isReplaceable,
+  mergeCategory,
   regenerateBrief,
   regenerateCategory,
   regenerateSchedule,
