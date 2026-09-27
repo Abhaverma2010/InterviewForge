@@ -19,6 +19,8 @@
     "dev:api": "npm run dev -w @interviewforge/api",
     "test": "npm run test --workspaces --if-present && node --test \"test/**/*.test.js\"",
     "models": "node scripts/list-models.js",
-    "summarize": "node scripts/summarize.js"
+    "summarize": "node scripts/summarize.js",
+    "dev:web": "npm run dev -w @interviewforge/web",
+    "build:web": "npm run build -w @interviewforge/web"
   }
 }
