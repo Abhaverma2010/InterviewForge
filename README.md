@@ -7,7 +7,7 @@ kit: a company brief, a role breakdown, a categorised question bank, flashcards 
 schedule. You can reshape every part of it, regenerate one section without losing your edits, and
 practise against it.
 
-- **Live app:** _add the Vercel URL here_ · **API:** _add the Render URL here_
+- **Live app:** https://interview-forge-web.vercel.app · **API:** https://interviewforge-api-dycm.onrender.com (health check: [`/api/health`](https://interviewforge-api-dycm.onrender.com/api/health); the free plan sleeps, so the first request can take ~50 s)
 - **Demo account:** `demo@interviewforge.dev` / `demo-password-2026` (ready-made kits, no waiting)
 - **Walkthrough video:** _add the link here_
 
