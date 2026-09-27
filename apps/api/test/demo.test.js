@@ -38,3 +38,16 @@ test('the demo seed creates a working account with valid kits, and can be re-run
     server.close();
   }
 });
+
+test('onlyIfMissing leaves an existing demo account and its edits alone', async () => {
+  const store = createMemoryStore();
+  const first = await seedDemo(store, { log: () => {}, onlyIfMissing: true });
+  assert.equal(first.seeded, true);
+  const user = await store.users.findByEmail(DEMO_EMAIL);
+  const [kit] = await store.kits.listByOwner(user.id);
+  await store.kits.remove(kit.id); // a visitor deleted a kit
+
+  const second = await seedDemo(store, { log: () => {}, onlyIfMissing: true });
+  assert.equal(second.seeded, false);
+  assert.equal((await store.kits.listByOwner(user.id)).length, 3);
+});

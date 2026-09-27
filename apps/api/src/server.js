@@ -31,11 +31,15 @@ if (config.mongoUri) {
   console.warn('MONGODB_URI is not set: using an in-memory store. Data is lost on restart.');
 }
 
-// SEED_DEMO=true creates the demo account on startup (handy without MongoDB,
-// where the in-memory store starts empty on every run).
-if (process.env.SEED_DEMO === 'true') {
-  const { email, password } = await seedDemo(store, { log: () => {} });
-  console.log(`Demo account ready: ${email} / ${password}`);
+// SEED_DEMO=true creates the demo account on startup if it does not exist yet
+// (no MongoDB: every start; deployed: the first start, then visitors' edits
+// survive restarts). SEED_DEMO=reset recreates it from scratch on every start.
+if (process.env.SEED_DEMO === 'true' || process.env.SEED_DEMO === 'reset') {
+  const { email, password, seeded } = await seedDemo(store, {
+    log: () => {},
+    onlyIfMissing: process.env.SEED_DEMO === 'true',
+  });
+  console.log(`Demo account ${seeded ? 'created' : 'already present'}: ${email} / ${password}`);
 }
 
 const queue = createGenerationQueue({

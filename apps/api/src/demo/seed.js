@@ -20,8 +20,19 @@ const DONE_STEPS = [
   'complete',
 ];
 
-export async function seedDemo(store, { log = console.log } = {}) {
+/**
+ * @param {object} store
+ * @param {object} [opts]
+ * @param {boolean} [opts.onlyIfMissing]  leave an existing demo account alone
+ *   (for servers that seed on every start: visitors' edits survive restarts)
+ * @returns {Promise<{ email: string, password: string, seeded: boolean }>}
+ */
+export async function seedDemo(store, { log = console.log, onlyIfMissing = false } = {}) {
   let user = await store.users.findByEmail(DEMO_EMAIL);
+  if (user && onlyIfMissing) {
+    log(`Demo user ${DEMO_EMAIL} already exists; left as it is`);
+    return { email: DEMO_EMAIL, password: DEMO_PASSWORD, seeded: false };
+  }
   if (!user) {
     user = await store.users.create({
       email: DEMO_EMAIL,
@@ -82,5 +93,5 @@ export async function seedDemo(store, { log = console.log } = {}) {
     });
     log(`  ${kit.role.title} at ${kit.source.company}: ${record.id}`);
   }
-  return { email: DEMO_EMAIL, password: DEMO_PASSWORD };
+  return { email: DEMO_EMAIL, password: DEMO_PASSWORD, seeded: true };
 }

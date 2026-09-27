@@ -35,3 +35,6 @@ services:
         value: 'false'
       - key: GENERATION_CONCURRENCY
         value: '1'
+      # Creates the demo account in the database on first start (then leaves it alone).
+      - key: SEED_DEMO
+        value: 'true'

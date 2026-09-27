@@ -121,8 +121,10 @@ npm run summarize -- kits.json     # optional: a readable overview of the output
 | Web | Vercel | Import the repository, set **Root Directory** to `apps/web`, and add the environment variable `API_ORIGIN` = the Render URL (for example `https://interviewforge-api.onrender.com`). |
 
 The browser only ever talks to the Vercel app. Next.js forwards `/api/*` to the API
-(`apps/web/next.config.mjs`), so the session cookie is first-party and no CORS is needed. After the first
-deploy, run `npm run seed:demo` locally against the same `MONGODB_URI` to create the demo account.
+(`apps/web/next.config.mjs`), so the session cookie is first-party and no CORS is needed. The blueprint
+sets `SEED_DEMO=true`, so the API creates the demo account in the database on its first start and leaves
+it alone afterwards (`SEED_DEMO=reset` recreates it on every start; `npm run seed:demo` does it from a
+local machine).
 
 On the free Render plan the API sleeps after 15 minutes idle; the first request then takes about a
 minute. Unfinished generations are resumed when it wakes (see [failure handling](#edge-cases-and-failure-handling)).
